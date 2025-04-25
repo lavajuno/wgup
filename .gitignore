@@ -1,1 +1,4 @@
 .venv
+wg-tui.conf.json
+conf.d
+**/__pycache__
