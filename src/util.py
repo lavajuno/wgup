@@ -1,12 +1,11 @@
 import ipaddress
 import re
 
-_REGEX_CIDR = r".*\/\d{1,2}"
 _REGEX_IFNAME = r"[a-z][a-z0-9_]{1,14}"
 
 class Input:
     @staticmethod
-    def get_int(min: int | None = None, max: int | None = None):
+    def get_int(min_value: int | None = None, max_value: int | None = None):
         while True:
             value = input()
             valid = True
@@ -14,11 +13,11 @@ class Input:
                 value = int(value)
             except ValueError: 
                 valid = False
-            if min is not None and value < min:
-                print(f"Too small! (minimum is {min})")
+            if min_value is not None and value < min_value:
+                print(f"Too small! (minimum is {min_value})")
                 valid = False
-            if max is not None and value > max:
-                print(f"Too small! (minimum is {max})")
+            if max_value is not None and value > max_value:
+                print(f"Too small! (minimum is {max_value})")
                 valid = False
             if valid:
                 return value
@@ -26,43 +25,47 @@ class Input:
                 print("Please try again:")
 
     @staticmethod
-    def get_cidr4():
+    def get_cidr4(optional: bool = False):
         while True:
             value = input()
             valid = True
-            if not re.fullmatch(_REGEX_CIDR, value):
-                print("Not a valid CIDR block.")
-                valid = False
-            try:
-                ipaddress.IPv4Address(value)
-            except ValueError:
-                print("Not a valid base address.")
-                valid = False
+            if value:
+                try:
+                    ipaddress.IPv4Network(value)
+                except ValueError:
+                    print("Not a valid IPv4 CIDR block.")
+                    valid = False
+            else:
+                if not optional:
+                    print("Value is required.")
+                    valid = False
             if valid:
                 return value
             else:
                 print("Please try again:")
 
     @staticmethod
-    def get_cidr6():
+    def get_cidr6(optional: bool = False):
         while True:
             value = input()
             valid = True
-            if not re.fullmatch(_REGEX_CIDR, value):
-                print("Not a valid CIDR block.")
-                valid = False
-            try:
-                ipaddress.IPv6Address(value)
-            except ValueError:
-                print("Not a valid base address.")
-                valid = False
+            if value:
+                try:
+                    ipaddress.IPv6Network(value)
+                except ValueError:
+                    print("Not a valid IPv6 CIDR block.")
+                    valid = False
+            else:
+                if not optional:
+                    print("Value is required.")
+                    valid = False
             if valid:
                 return value
             else:
                 print("Please try again:")
 
     @staticmethod
-    def get_ifname():
+    def get_iface():
         while True:
             value = input()
             valid = True
@@ -73,3 +76,25 @@ class Input:
                 return value
             else:
                 print("Please try again:")
+
+    @staticmethod
+    def get_str(optional: bool = False):
+        while True:
+            value = input()
+            valid = True
+            if not value and not optional:
+                print("Value is required.")
+                valid = False
+            if valid:
+                return value
+            else:
+                print("Please try again:")
+
+class IP:
+    @staticmethod
+    def nth_addr4(cidr4: str, index: int):
+        return str(ipaddress.IPv4Network(cidr4)[index])
+
+    @staticmethod
+    def nth_addr6(cidr6: str, index: int):
+        return str(ipaddress.IPv6Network(cidr6)[index])

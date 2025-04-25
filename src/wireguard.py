@@ -1,6 +1,8 @@
+import ipaddress
 import subprocess
 import json
 import argparse
+from src.util import IP
 
 CONFIG_FW_VPN_FWD = """
 # Firewall: Allow traffic flow within VPN interface
@@ -117,17 +119,36 @@ class Peer:
     def __init__(
         self,
         *,
+        id: int,
+        nickname: str,
         private_key: str,
         public_key: str,
         preshared_key: str,
         cidr4: str,
         cidr6: str,
     ):
+        self.id = id
+        self.nickname = nickname
         self.private_key = private_key
         self.public_key = public_key
         self.preshared_key = preshared_key
         self.cidr4 = cidr4
         self.cidr6 = cidr6
+
+    @classmethod
+    def create(cls, *, id: int, nickname: str, cidr4: str, cidr6: str):
+        private_key = Wireguard.generate_private_key()
+        public_key = Wireguard.generate_public_key(private_key)
+        preshared_key = Wireguard.generate_preshared_key()
+        return cls(
+            id=id,
+            nickname=nickname,
+            private_key=private_key,
+            public_key=public_key,
+            preshared_key=preshared_key,
+            cidr4=cidr4,
+            cidr6=cidr6,
+        )
 
     def __get_peer_header(self) -> str:
         return CONFIG_PEER_HEADER.format(
@@ -161,6 +182,8 @@ class Peer:
     
     def to_json(self):
         return {
+            "id": self.id,
+            "nickname": self.nickname,
             "private_key": self.private_key,
             "public_key": self.public_key,
             "preshared_key": self.preshared_key,
@@ -171,6 +194,8 @@ class Peer:
     @classmethod
     def from_json(cls, data: dict):
         return cls(
+            id=data["id"],
+            nickname=data["nickname"],
             private_key=data["private_key"],
             public_key=data["public_key"],
             preshared_key=data["preshared_key"],
@@ -182,6 +207,7 @@ class Network:
     def __init__(
         self,
         *,
+        id: int,
         private_key: str,
         public_key: str,
         vpn_iface: str,
@@ -191,11 +217,12 @@ class Network:
         addr6: str,
         host: str,
         port: int,
-        nat_iface: str = "",
-        nat_cidr4: list[str] = [],
-        nat_cidr6: list[str] = [],
-        peers: list[Peer] = [],
+        nat_iface: str | None = None,
+        nat_cidr4: list[str] | None = None,
+        nat_cidr6: list[str] | None = None,
+        peers: dict[int, Peer] | None = None,
     ):
+        self.id = id
         self.private_key = private_key
         self.public_key = public_key
         self.vpn_iface = vpn_iface
@@ -205,11 +232,35 @@ class Network:
         self.addr6 = addr6
         self.host = host
         self.port = port
+        if nat_iface is None:
+            nat_iface = ""
         self.nat_iface = nat_iface
+        if nat_cidr4 is None:
+            nat_cidr4 = []
         self.nat_cidr4 = nat_cidr4
+        if nat_cidr6 is None:
+            nat_cidr6 = []
         self.nat_cidr6 = nat_cidr6
+        if peers is None:
+            peers = {}
         self.peers = peers
 
+    @classmethod
+    def create(cls, *, id: int, vpn_iface: str, vpn_cidr4: str, vpn_cidr6: str, host: str, port: int):
+        private_key = Wireguard.generate_private_key()
+        public_key = Wireguard.generate_public_key(private_key)
+        return cls(
+            id=id,
+            private_key=private_key,
+            public_key=public_key,
+            vpn_iface=vpn_iface,
+            vpn_cidr4=vpn_cidr4,
+            vpn_cidr6=vpn_cidr6,
+            addr4=IP.nth_addr4(vpn_cidr4, 0),
+            addr6=IP.nth_addr6(vpn_cidr6, 0),
+            host=host,
+            port=port,
+        )
 
     def __get_fw_vpn_fwd(self) -> str:
         return CONFIG_FW_VPN_FWD.format(vpn_iface=self.vpn_iface)
@@ -241,7 +292,7 @@ class Network:
                 cidr4=peer.cidr4,
                 cidr6=peer.cidr6,
             )
-            for peer in self.peers
+            for peer in self.peers.values()
         )
     
     def __get_nat_config(self) -> str:
@@ -262,6 +313,7 @@ class Network:
     
     def to_json(self):
         return {
+            "id": self.id,
             "private_key": self.private_key,
             "public_key": self.public_key,
             "vpn_iface": self.vpn_iface,
@@ -274,12 +326,17 @@ class Network:
             "nat_iface": self.nat_iface,
             "nat_cidr4": self.nat_cidr4,
             "nat_cidr6": self.nat_cidr6,
-            "peers": list(p.to_json() for p in self.peers),
+            "peers": list(p.to_json() for p in self.peers.values()),
         }
     
     @classmethod
     def from_json(cls, data: dict):
+        peers: dict[int, Peer] = {}
+        for p in data["peers"]:
+            peer = Peer.from_json(p)
+            peers[peer.id] = peer
         return cls(
+            id=data["id"],
             private_key=data["private_key"],
             public_key=data["public_key"],
             vpn_iface=data["vpn_iface"],
@@ -292,7 +349,7 @@ class Network:
             nat_iface=data["nat_iface"],
             nat_cidr4=data["nat_cidr4"],
             nat_cidr6=data["nat_cidr6"],
-            peers = list(Peer.from_json(p) for p in data["peers"]),
+            peers=peers,
         )
 
 if __name__ == "__main__":
