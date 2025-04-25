@@ -20,6 +20,7 @@ class Frontend:
         MANAGE_PEER = 6
         DELETE_PEER = 7
         EXPORT_PEER = 8
+        QUIT = 9
 
     def __init__(self):
         self.config = Config()
@@ -49,15 +50,17 @@ class Frontend:
                     self.__state_delete_peer()
                 case self.State.EXPORT_PEER:
                     self.__state_export_peer()
+                case self.State.QUIT:
+                    return
                 case _:
                     _logger.error("Frontend: Invalid state.")
                     raise ValueError("Frontend: invalid state.")
 
     def __state_select_network(self):
-        print("Networks:")
+        print("[i] Select a network to manage.")
         print(
             _FMT_NETWORKS.format(
-                index="NO.",
+                index="#",
                 iface="INTERFACE",
                 port="PORT",
             )
@@ -71,20 +74,23 @@ class Frontend:
                     port=net.port,
                 )
             )
-        print("Select a network:")
+        print("-> Enter network #, [c] to create, [q] to quit")
         choice = input()
         match choice:
             case "c":
                 self.state = self.State.CREATE_NETWORK
+            case "q":
+                self.state = self.State.QUIT
         pass
 
     def __state_create_network(self):
-        print('VPN interface name: (ex. "wg0")')
-        ifname = input()
-        print('VPN IPv4 address pool (ex. "192.168.254.0/24"):')
-        cidr4 = input()
-        print('VPN IPv6 address pool (ex. "fd00:cafe:/64"):')
-        cidr6 = input()
+        print("[i] Creating a new network.")
+        print('-> Enter VPN interface name (ex. "wg0"):')
+        ifname = Input.get_ifname()
+        print('-> Enter VPN IPv4 address pool (ex. "192.168.254.0/24"):')
+        cidr4 = Input.get_cidr4()
+        print('-> Enter VPN IPv6 address pool (ex. "fd00:cafe:/64"):')
+        cidr6 = Input.get_cidr6()
         pass
 
     def __state_manage_network(self):
