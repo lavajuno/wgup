@@ -1,15 +1,15 @@
-from enum import Enum
 import logging
+from enum import Enum
 
-from src import Wireguard, Peer, Network
-from src import Config
-from src.util import Input, IP
+from src import Config, Network, Peer, Wireguard
+from src.util import IP, Input
 
 _logger = logging.getLogger()
 
 _FMT_NETWORKS = "| {id:3} | {iface:15} | {port}"
 _FMT_PEERS = "| {id:3} | {nickname:15} | {cidr4:14} | {cidr6}"
 _FMT_ATTRS = "| {:20} | {}"
+
 
 class Frontend:
     class State(Enum):
@@ -107,7 +107,9 @@ class Frontend:
         print("\n2. Endpoint setup:\n")
         print('-> Enter port peers will use to connect (ex. "12345"):')
         port = Input.get_int(min_value=0, max_value=65535)
-        print('-> Enter hostname/address peers will use to connect (ex. "vpn.example.com"):')
+        print(
+            '-> Enter hostname/address peers will use to connect (ex. "vpn.example.com"):'
+        )
         host = Input.get_str(optional=True)
         id = max(self.config.networks.keys(), default=0) + 1
         network = Network.create(
@@ -201,9 +203,9 @@ class Frontend:
         print("[i] Creating a new peer.")
         print('-> Enter peer nickname (ex. "laptop"):')
         nickname = Input.get_str()
-        print('-> Enter peer IPv4 address  (leave blank to assign automatically):')
+        print("-> Enter peer IPv4 address  (leave blank to assign automatically):")
         cidr4 = Input.get_cidr4(optional=True)
-        print('-> Enter peer IPv6 address (leave blank to assign automatically):')
+        print("-> Enter peer IPv6 address (leave blank to assign automatically):")
         cidr6 = Input.get_cidr6(optional=True)
         id = max(self.selected_network.peers.keys(), default=0) + 1
         if not cidr4:

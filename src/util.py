@@ -3,6 +3,7 @@ import re
 
 _REGEX_IFNAME = r"[a-z][a-z0-9_]{1,14}"
 
+
 class Input:
     @staticmethod
     def get_int(min_value: int | None = None, max_value: int | None = None):
@@ -11,7 +12,7 @@ class Input:
             valid = True
             try:
                 value = int(value)
-            except ValueError: 
+            except ValueError:
                 valid = False
             if min_value is not None and value < min_value:
                 print(f"Too small! (minimum is {min_value})")
@@ -89,6 +90,7 @@ class Input:
                 return value
             else:
                 print("Please try again:")
+
 
 class IP:
     @staticmethod

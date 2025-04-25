@@ -9,6 +9,7 @@ _CONFIG_DIR = f"{os.getcwd()}/conf.d"
 
 _CONFIG_NETWORKS = f"{_CONFIG_DIR}/networks.json"
 
+
 class Config:
     _instance = None
 
@@ -17,7 +18,7 @@ class Config:
             cls._instance = super(Config, cls).__new__(cls)
             cls._instance._setup()
         return cls._instance
-    
+
     def _setup(self):
         self.networks: dict[int, Network] = {}
         os.makedirs(_CONFIG_DIR, exist_ok=True)

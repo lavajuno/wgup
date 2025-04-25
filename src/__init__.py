@@ -1,4 +1,4 @@
-from .wireguard import Wireguard, Peer, Network
 from .config import Config
-from .util import Input
 from .frontend import Frontend
+from .util import Input
+from .wireguard import Network, Peer, Wireguard

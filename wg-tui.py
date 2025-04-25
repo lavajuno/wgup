@@ -1,8 +1,8 @@
 import argparse
-from enum import Enum
 import logging
+from enum import Enum
 
-from src import Wireguard, Peer, Network, Frontend
+from src import Frontend, Network, Peer, Wireguard
 
 _logger = logging.getLogger()
 _logger.setLevel(logging.INFO)
@@ -13,9 +13,11 @@ _stderr_handler.setFormatter(
 )
 _logger.addHandler(_stderr_handler)
 
+
 def main():
     frontend = Frontend()
     frontend.run()
+
 
 if __name__ == "__main__":
     try:
