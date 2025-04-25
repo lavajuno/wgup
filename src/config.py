@@ -1,13 +1,16 @@
 import json
+import logging
 import os
 
-from src import Network
+from .wireguard import Network
 
 _VERSION_SERIAL = 1
 
 _CONFIG_DIR = f"{os.getcwd()}/conf.d"
 
 _CONFIG_NETWORKS = f"{_CONFIG_DIR}/networks.json"
+
+_logger = logging.getLogger()
 
 
 class Config:
@@ -42,3 +45,4 @@ class Config:
         }
         with open(_CONFIG_NETWORKS, "w") as f:
             f.write(json.dumps(networks_json, indent=4))
+        _logger.info("Saved configuration.")

@@ -3,7 +3,7 @@ import ipaddress
 import json
 import subprocess
 
-from src.util import IP
+from .util import IP
 
 CONFIG_FW_VPN_FWD = """
 # Firewall: Allow traffic flow within VPN interface

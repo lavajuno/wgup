@@ -79,13 +79,23 @@ class Input:
                 print("Please try again:")
 
     @staticmethod
-    def get_str(optional: bool = False):
+    def get_str(
+        optional: bool = False,
+        min_length: int | None = None,
+        max_length: int | None = None,
+    ):
         while True:
             value = input()
             valid = True
-            if not value and not optional:
-                print("Value is required.")
-                valid = False
+            if value:
+                if min_length is not None and len(value) < min_length:
+                    print(f"Too short (minimum length is {min_length}).")
+                if max_length is not None and len(value) > max_length:
+                    print(f"Too long (maximum length is {max_length}).")
+            else:
+                if not optional:
+                    print("Value is required.")
+                    valid = False
             if valid:
                 return value
             else:
