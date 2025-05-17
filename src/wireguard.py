@@ -167,8 +167,8 @@ class Peer:
         public_key: str,
         vpn_cidr4: str,
         vpn_cidr6: str,
-        nat_cidr4: str,
-        nat_cidr6: str,
+        nat_cidr4: list[str],
+        nat_cidr6: list[str],
         endpoint: str,
     ) -> str:
         return CONFIG_PEER_ENDPOINT.format(
@@ -386,6 +386,8 @@ class Network:
 
 if __name__ == "__main__":
     p = Peer(
+        id=0,
+        nickname="testpeer",
         private_key="peer_private_key",
         public_key="peer_public_key",
         preshared_key="peer_preshared_key",
@@ -393,6 +395,7 @@ if __name__ == "__main__":
         cidr6="fdfe::2/64",
     )
     n = Network(
+        id=0,
         private_key="privkey",
         public_key="pubkey",
         vpn_iface="vpn",
@@ -405,7 +408,7 @@ if __name__ == "__main__":
         nat_iface="eth0",
         nat_cidr4=["0.0.0.0/0"],
         nat_cidr6=["::/0"],
-        peers=[p],
+        peers={0: p},
     )
 
     print(n.get_config())

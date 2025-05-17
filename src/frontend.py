@@ -5,7 +5,7 @@ from .config import Config
 from .util import IP, Input
 from .wireguard import Network, Peer, Wireguard
 
-_logger = logging.getLogger()
+_logger = logging.getLogger("wg-tui")
 
 _FMT_NETWORKS = "| {id:3} | {iface:15} | {port}"
 _FMT_PEERS = "| {id:3} | {nickname:15} | {cidr4:14} | {cidr6}"
@@ -26,6 +26,7 @@ class Frontend:
         PEER_DELETE = 9
         PEER_EXPORT = 10
         QUIT = 11
+        NAT_RECONFIGURE = 12
 
     def __init__(self):
         self.config = Config()
@@ -59,7 +60,10 @@ class Frontend:
                     self.__state_peer_delete()
                 case self.State.PEER_EXPORT:
                     self.__state_peer_export()
+                case self.State.NAT_RECONFIGURE:
+                    self.__state_nat_reconfigure()
                 case self.State.QUIT:
+                    print("[i] Exiting.")
                     return
                 case _:
                     _logger.error("Frontend: Invalid state.")
@@ -104,9 +108,9 @@ class Frontend:
         print("\n1. VPN setup:\n")
         print('-> Enter VPN interface name (ex. "wgchangeme"):')
         iface = Input.get_iface()
-        print('-> Enter VPN IPv4 address pool (ex. "169.254.0.0/16"):')
+        print('-> Enter VPN IPv4 block (ex. "169.254.0.0/16"):')
         cidr4 = Input.get_cidr4()
-        print('-> Enter VPN IPv6 address pool (ex. "2001:db8::/64"):')
+        print('-> Enter VPN IPv6 block (ex. "2001:db8::/64"):')
         cidr6 = Input.get_cidr6()
         print("\n2. Endpoint setup:\n")
         print('-> Enter port peers will use to connect (ex. "12345"):')
@@ -131,11 +135,17 @@ class Frontend:
 
     def __state_network_manage(self):
         net = self.selected_network
+        assert net is not None
         print(f'[i] Managing network "{net.vpn_iface}"')
         print(_FMT_ATTRS.format("ATTRIBUTE", "VALUE"))
         print(_FMT_ATTRS.format("Public Key", net.public_key))
         print(_FMT_ATTRS.format("VPN IPv4 Pool", net.vpn_cidr4))
         print(_FMT_ATTRS.format("VPN IPv6 Pool", net.vpn_cidr6))
+        print(_FMT_ATTRS.format("NAT", "Enabled" if net.nat_iface else "Disabled"))
+        if net.nat_iface:
+            print(_FMT_ATTRS.format("NAT interface", net.nat_iface))
+            print(_FMT_ATTRS.format("NAT dest (v4)", net.nat_cidr4))
+            print(_FMT_ATTRS.format("NAT dest (v6)", net.nat_cidr6))
         print("\n[i] Options:")
         print("  m: Manage peers            n: Configure NAT   d: Delete network")
         print("  b: Back to networks list   q: Quit")
@@ -145,7 +155,7 @@ class Frontend:
             case "m":
                 self.state = self.State.PEER_SELECT
             case "n":
-                _logger.warning("Not implemented")
+                self.state = self.State.NAT_RECONFIGURE
             case "d":
                 self.state = self.State.NETWORK_DELETE
             case "b":
@@ -154,8 +164,21 @@ class Frontend:
                 self.state = self.State.QUIT
 
     def __state_network_delete(self):
-        _logger.warning("Not implemented")
-        self.state = self.State.NETWORK_MANAGE
+        net = self.selected_network
+        assert net is not None
+        print(f'[i] Deleting network "{net.vpn_iface}"')
+        print("[i] YOU ARE ABOUT TO DELETE THIS NETWORK AND ALL ITS PEERS!")
+        print("    Are you sure?")
+        print("-> Enter the network interface name to delete it.")
+        print("   Leave blank to cancel.")
+        choice = Input.get_str(optional=True)
+        if choice == net.vpn_iface:
+            del self.config.networks[net.id]
+            self.selected_network = None
+            self.config.save_networks()
+            self.state = self.State.NETWORK_SELECT
+        else:
+            self.state = self.State.NETWORK_MANAGE
 
     def __state_network_apply(self):
         _logger.warning("Not implemented")
@@ -167,6 +190,7 @@ class Frontend:
 
     def __state_peer_select(self):
         net = self.selected_network
+        assert net is not None
         print("[i] Select a peer to manage.")
         print(
             _FMT_PEERS.format(
@@ -206,6 +230,8 @@ class Frontend:
                     return
 
     def __state_peer_create(self):
+        net = self.selected_network
+        assert net is not None
         print("[i] Creating a new peer.")
         print('-> Enter peer nickname (ex. "laptop"):')
         nickname = Input.get_str()
@@ -213,25 +239,27 @@ class Frontend:
         cidr4 = Input.get_cidr4(optional=True)
         print("-> Enter peer IPv6 address (leave blank to assign automatically):")
         cidr6 = Input.get_cidr6(optional=True)
-        id = max(self.selected_network.peers.keys(), default=0) + 1
+        id = max(net.peers.keys(), default=0) + 1
         if not cidr4:
-            cidr4 = IP.nth_addr4(self.selected_network.vpn_cidr4, id) + "/32"
+            cidr4 = IP.nth_addr4(net.vpn_cidr4, id) + "/32"
         if not cidr6:
-            cidr6 = IP.nth_addr6(self.selected_network.vpn_cidr6, id) + "/128"
+            cidr6 = IP.nth_addr6(net.vpn_cidr6, id) + "/128"
         peer = Peer.create(
             id=id,
             nickname=nickname,
             cidr4=cidr4,
             cidr6=cidr6,
         )
-        self.selected_network.peers[id] = peer
+        net.peers[id] = peer
         self.config.save_networks()
         self.selected_peer = peer
         self.state = self.State.PEER_MANAGE
 
     def __state_peer_manage(self):
         net = self.selected_network
+        assert net is not None
         peer = self.selected_peer
+        assert peer is not None
         print(f'[i] Managing peer "{peer.nickname}" in network "{net.vpn_iface}".')
         print(_FMT_ATTRS.format("ATTRIBUTE", "VALUE"))
         print(_FMT_ATTRS.format("Nickname", peer.nickname))
@@ -257,11 +285,15 @@ class Frontend:
                 self.state = self.State.QUIT
 
     def __state_peer_delete(self):
+        net = self.selected_network
+        assert net is not None
+        peer = self.selected_peer
+        assert peer is not None
         _logger.warning("Not implemented")
         print("-> Are you sure you want to delete this peer? (y/N):")
         choice = Input.get_str(optional=True)
         if choice.lower() == "y":
-            del self.selected_network.peers[self.selected_peer.id]
+            del net.peers[peer.id]
             _logger.info("Peer deleted.")
         else:
             _logger.warning("Deletion cancelled, no changes were made.")
@@ -269,11 +301,13 @@ class Frontend:
 
     def __state_peer_export(self):
         net = self.selected_network
+        assert net is not None
         peer = self.selected_peer
+        assert peer is not None
         filename = f"{net.vpn_iface}__{peer.nickname}.conf"
         with open(filename, "w") as f:
             f.write(
-                self.selected_peer.get_config(
+                peer.get_config(
                     vpn_cidr4=net.vpn_cidr4,
                     vpn_cidr6=net.vpn_cidr6,
                     nat_cidr4=net.nat_cidr4,
@@ -284,3 +318,47 @@ class Frontend:
             )
         _logger.info("Wrote %s", filename)
         self.state = self.State.PEER_MANAGE
+
+    def __state_nat_reconfigure(self):
+        net = self.selected_network
+        assert net is not None
+        print(f'[i] Configuring NAT for network "{net.vpn_iface}"')
+        try:
+            print('-> (optional) Enter NAT interface name (ex. "eth0"):')
+            print("   Leave blank to disable NAT.")
+            nat_iface = Input.get_iface(optional=True)
+            nat_cidr4: list[str] = []
+            nat_cidr6: list[str] = []
+            if nat_iface:
+                print('-> Enter NAT dest IPv4 block (ex. "0.0.0.0/0"):')
+                nat_cidr4.append(Input.get_cidr4())
+                while True:
+                    print(
+                        '-> (optional) Enter another NAT dest IPv4 block (ex. "0.0.0.0/0"):'
+                    )
+                    print("   Leave blank to continue.")
+                    choice = Input.get_cidr4(optional=True)
+                    if choice:
+                        nat_cidr4.append(choice)
+                    else:
+                        break
+                print('-> Enter NAT dest IPv6 block (ex. "::/0"):')
+                nat_cidr6.append(Input.get_cidr6())
+                while True:
+                    print(
+                        '-> (optional) Enter another NAT dest IPv6 block (ex. "::/0"):'
+                    )
+                    print("   Leave blank to continue.")
+                    choice = Input.get_cidr4(optional=True)
+                    if choice:
+                        nat_cidr6.append(choice)
+                    else:
+                        break
+            net.nat_iface = nat_iface
+            net.nat_cidr4 = nat_cidr4
+            net.nat_cidr6 = nat_cidr6
+            self.config.save_networks()
+        except KeyboardInterrupt:
+            print("[i] Interrupted.")
+            pass
+        self.state = self.State.NETWORK_MANAGE

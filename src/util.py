@@ -12,16 +12,16 @@ class Input:
             valid = True
             try:
                 value = int(value)
+                if min_value is not None and value < min_value:
+                    print(f"Too small! (minimum is {min_value})")
+                    valid = False
+                if max_value is not None and value > max_value:
+                    print(f"Too small! (minimum is {max_value})")
+                    valid = False
+                if valid:
+                    return value
             except ValueError:
-                valid = False
-            if min_value is not None and value < min_value:
-                print(f"Too small! (minimum is {min_value})")
-                valid = False
-            if max_value is not None and value > max_value:
-                print(f"Too small! (minimum is {max_value})")
-                valid = False
-            if valid:
-                return value
+                pass
             else:
                 print("Please try again:")
 
@@ -66,13 +66,18 @@ class Input:
                 print("Please try again:")
 
     @staticmethod
-    def get_iface():
+    def get_iface(optional: bool = False):
         while True:
             value = input()
             valid = True
-            if not re.fullmatch(_REGEX_IFNAME, value):
-                print("Not a valid interface name.")
-                valid = False
+            if value:
+                if not re.fullmatch(_REGEX_IFNAME, value):
+                    print("Not a valid interface name.")
+                    valid = False
+            else:
+                if not optional:
+                    print("Value is required.")
+                    valid = False
             if valid:
                 return value
             else:

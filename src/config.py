@@ -10,7 +10,7 @@ _CONFIG_DIR = f"{os.getcwd()}/conf.d"
 
 _CONFIG_NETWORKS = f"{_CONFIG_DIR}/networks.json"
 
-_logger = logging.getLogger()
+_logger = logging.getLogger("wg-tui")
 
 
 class Config:
