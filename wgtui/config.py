@@ -2,13 +2,12 @@ import json
 import logging
 import os
 
-from .wireguard import Interface
+from wgtui.wireguard import Interface
+from wgtui import defaults
 
 _VERSION_SERIAL = 1
 
-_CONFIG_DIR = f"{os.getcwd()}/conf.d"
-
-_CONFIG_NETWORKS = f"{_CONFIG_DIR}/networks.json"
+_CONFIG_INTERFACES = f"{defaults.CONFIG_DIR}/interfaces.json"
 
 _logger = logging.getLogger("wg-tui")
 
@@ -23,26 +22,26 @@ class Config:
         return cls._instance
 
     def _setup(self):
-        self.networks: dict[int, Interface] = {}
-        os.makedirs(_CONFIG_DIR, exist_ok=True)
-        self.load_networks()
+        self.interfaces: dict[str, Interface] = {}
+        os.makedirs(defaults.CONFIG_DIR, exist_ok=True)
+        self.load()
 
-    def load_networks(self):
-        if not os.path.exists(_CONFIG_NETWORKS):
+    def load(self):
+        if not os.path.exists(_CONFIG_INTERFACES):
             return
-        with open(_CONFIG_NETWORKS, "rb") as f:
+        with open(_CONFIG_INTERFACES, "rb") as f:
             networks_json = json.loads(f.read())
-        if networks_json["version"] != 1:
-            raise AssertionError("Incompatible config version!")
-        for n in networks_json["networks"]:
-            network = Interface.from_json(n)
-            self.networks[network.id] = network
+        if networks_json["version"] != defaults.CONFIG_VERSION:
+            raise AssertionError("Incompatible config version.")
+        for n in networks_json["interfaces"]:
+            interface = Interface.from_json(n)
+            self.interfaces[interface.vpn_iface] = interface
 
-    def save_networks(self):
-        networks_json = {
+    def save(self):
+        interfaces_json = {
             "version": _VERSION_SERIAL,
-            "networks": list(n.to_json() for n in self.networks.values()),
+            "interfaces": list(n.to_json() for n in self.interfaces.values()),
         }
-        with open(_CONFIG_NETWORKS, "w") as f:
-            f.write(json.dumps(networks_json, indent=4))
+        with open(_CONFIG_INTERFACES, "w") as f:
+            f.write(json.dumps(interfaces_json, indent=4))
         _logger.info("Saved configuration.")

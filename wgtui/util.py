@@ -5,83 +5,95 @@ _REGEX_IFNAME = r"[a-z][a-z0-9_]{1,14}"
 
 
 class Input:
-    @staticmethod
-    def get_int(min_value: int | None = None, max_value: int | None = None):
+    @classmethod
+    def get_int(cls, min_value: int | None = None, max_value: int | None = None):
         while True:
             value = input()
-            valid = True
+            valid, reason = cls.check_int(value, min_value=min_value, max_value=max_value)
+            if valid:
+                return int(value)
+            else:
+                print(reason)
+                print("Please try again:")
+
+    @staticmethod
+    def check_int(value: str | int, min_value: int | None = None, max_value: int | None = None):
+        try:
+            v = int(value)
+            if min_value is not None and v < min_value:
+                return False, f"Too small! (minimum is {min_value})"
+            if max_value is not None and v > max_value:
+                return False, f"Too large! (maximum is {max_value})"
+        except ValueError:
+            return False, "Value is not an integer."
+        return True, ""
+
+    @classmethod
+    def get_cidr4(cls, optional: bool = False):
+        while True:
+            value = input()
+            valid, reason = cls.check_cidr4(value, optional=optional)
+            if valid:
+                return value
+            else:
+                print(reason)
+                print("Please try again:")
+
+    @staticmethod
+    def check_cidr4(value: str, optional: bool = False):
+        if value:
             try:
-                value = int(value)
-                if min_value is not None and value < min_value:
-                    print(f"Too small! (minimum is {min_value})")
-                    valid = False
-                if max_value is not None and value > max_value:
-                    print(f"Too small! (minimum is {max_value})")
-                    valid = False
-                if valid:
-                    return value
+                ipaddress.IPv4Network(value)
             except ValueError:
-                pass
-            else:
-                print("Please try again:")
-
-    @staticmethod
-    def get_cidr4(optional: bool = False):
+                return False, "Not a valid IPv4 CIDR block."
+        else:
+            if not optional:
+                return False, "Value is required."
+        return True, ""
+    
+    @classmethod
+    def get_cidr6(cls, optional: bool = False):
         while True:
             value = input()
-            valid = True
-            if value:
-                try:
-                    ipaddress.IPv4Network(value)
-                except ValueError:
-                    print("Not a valid IPv4 CIDR block.")
-                    valid = False
-            else:
-                if not optional:
-                    print("Value is required.")
-                    valid = False
+            valid, reason = cls.check_cidr6(value, optional=optional)
             if valid:
                 return value
             else:
+                print(reason)
                 print("Please try again:")
 
     @staticmethod
-    def get_cidr6(optional: bool = False):
+    def check_cidr6(value: str, optional: bool = False):
+        if value:
+            try:
+                ipaddress.IPv6Network(value)
+            except ValueError:
+                return False, "Not a valid IPv6 CIDR block."
+        else:
+            if not optional:
+                return False, "Value is required."
+        return True, ""
+    
+    @classmethod
+    def get_iface(cls, optional: bool = False):
         while True:
             value = input()
-            valid = True
-            if value:
-                try:
-                    ipaddress.IPv6Network(value)
-                except ValueError:
-                    print("Not a valid IPv6 CIDR block.")
-                    valid = False
-            else:
-                if not optional:
-                    print("Value is required.")
-                    valid = False
+            valid, reason = cls.check_iface(value, optional=optional)
             if valid:
                 return value
             else:
+                print(reason)
                 print("Please try again:")
 
     @staticmethod
-    def get_iface(optional: bool = False):
-        while True:
-            value = input()
-            valid = True
-            if value:
-                if not re.fullmatch(_REGEX_IFNAME, value):
-                    print("Not a valid interface name.")
-                    valid = False
-            else:
-                if not optional:
-                    print("Value is required.")
-                    valid = False
-            if valid:
-                return value
-            else:
-                print("Please try again:")
+    def check_iface(value: str, optional: bool = False):
+        if value:
+            if not re.fullmatch(_REGEX_IFNAME, value):
+                return False, "Not a valid interface name."
+        else:
+            if not optional:
+                return False, "Value is required."
+        return True, ""
 
     @staticmethod
     def get_str(

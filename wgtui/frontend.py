@@ -78,7 +78,7 @@ class Frontend:
                 port="PORT",
             )
         )
-        for k, v in self.config.networks.items():
+        for k, v in self.config.interfaces.items():
             print(
                 _FMT_NETWORKS.format(
                     id=k,
@@ -98,7 +98,7 @@ class Frontend:
             case _:
                 try:
                     choice = int(choice)
-                    self.selected_network = self.config.networks[choice]
+                    self.selected_network = self.config.interfaces[choice]
                     self.state = self.State.NETWORK_MANAGE
                 except:
                     return
@@ -119,7 +119,7 @@ class Frontend:
             '-> Enter hostname/address peers will use to connect (ex. "vpn.example.com"):'
         )
         host = Input.get_str(optional=True)
-        id = max(self.config.networks.keys(), default=0) + 1
+        id = max(self.config.interfaces.keys(), default=0) + 1
         network = Interface.create(
             id=id,
             vpn_iface=iface,
@@ -128,8 +128,8 @@ class Frontend:
             port=port,
             host=host,
         )
-        self.config.networks[id] = network
-        self.config.save_networks()
+        self.config.interfaces[id] = network
+        self.config.save()
         self.selected_network = network
         self.state = self.State.NETWORK_MANAGE
 
@@ -173,9 +173,9 @@ class Frontend:
         print("   Leave blank to cancel.")
         choice = Input.get_str(optional=True)
         if choice == net.vpn_iface:
-            del self.config.networks[net.id]
+            del self.config.interfaces[net.id]
             self.selected_network = None
-            self.config.save_networks()
+            self.config.save()
             self.state = self.State.NETWORK_SELECT
         else:
             self.state = self.State.NETWORK_MANAGE
@@ -251,7 +251,7 @@ class Frontend:
             cidr6=cidr6,
         )
         net.peers[id] = peer
-        self.config.save_networks()
+        self.config.save()
         self.selected_peer = peer
         self.state = self.State.PEER_MANAGE
 
@@ -276,7 +276,7 @@ class Frontend:
                 self.state = self.State.PEER_EXPORT
             case "n":
                 peer.name = Input.get_str(min_length=1, max_length=20)
-                self.config.save_networks()
+                self.config.save()
             case "d":
                 self.state = self.State.PEER_DELETE
             case "b":
@@ -357,7 +357,7 @@ class Frontend:
             net.nat_iface = nat_iface
             net.nat_cidr4 = nat_cidr4
             net.nat_cidr6 = nat_cidr6
-            self.config.save_networks()
+            self.config.save()
         except KeyboardInterrupt:
             print("[i] Interrupted.")
             pass
