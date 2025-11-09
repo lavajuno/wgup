@@ -3,7 +3,7 @@ from enum import Enum
 
 from .config import Config
 from .util import IP, Input
-from .wireguard import Network, Peer, Wireguard
+from .wireguard import Interface, Peer, Wireguard
 
 _logger = logging.getLogger("wg-tui")
 
@@ -31,7 +31,7 @@ class Frontend:
     def __init__(self):
         self.config = Config()
         self.state = self.State.NETWORK_SELECT
-        self.selected_network: Network | None = None
+        self.selected_network: Interface | None = None
         self.selected_peer: Peer | None = None
 
     def run(self):
@@ -120,7 +120,7 @@ class Frontend:
         )
         host = Input.get_str(optional=True)
         id = max(self.config.networks.keys(), default=0) + 1
-        network = Network.create(
+        network = Interface.create(
             id=id,
             vpn_iface=iface,
             vpn_cidr4=cidr4,
@@ -204,7 +204,7 @@ class Frontend:
             print(
                 _FMT_PEERS.format(
                     id=k,
-                    nickname=v.nickname,
+                    nickname=v.name,
                     cidr4=v.cidr4,
                     cidr6=v.cidr6,
                 )
@@ -260,9 +260,9 @@ class Frontend:
         assert net is not None
         peer = self.selected_peer
         assert peer is not None
-        print(f'[i] Managing peer "{peer.nickname}" in network "{net.vpn_iface}".')
+        print(f'[i] Managing peer "{peer.name}" in network "{net.vpn_iface}".')
         print(_FMT_ATTRS.format("ATTRIBUTE", "VALUE"))
-        print(_FMT_ATTRS.format("Nickname", peer.nickname))
+        print(_FMT_ATTRS.format("Nickname", peer.name))
         print(_FMT_ATTRS.format("Public Key", peer.public_key))
         print(_FMT_ATTRS.format("IPv4 Addr(s)", peer.cidr4))
         print(_FMT_ATTRS.format("IPv6 Addr(s)", peer.cidr6))
@@ -275,7 +275,7 @@ class Frontend:
             case "e":
                 self.state = self.State.PEER_EXPORT
             case "n":
-                peer.nickname = Input.get_str(min_length=1, max_length=20)
+                peer.name = Input.get_str(min_length=1, max_length=20)
                 self.config.save_networks()
             case "d":
                 self.state = self.State.PEER_DELETE
@@ -304,7 +304,7 @@ class Frontend:
         assert net is not None
         peer = self.selected_peer
         assert peer is not None
-        filename = f"{net.vpn_iface}__{peer.nickname}.conf"
+        filename = f"{net.vpn_iface}__{peer.name}.conf"
         with open(filename, "w") as f:
             f.write(
                 peer.get_config(

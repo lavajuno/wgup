@@ -2,7 +2,7 @@ import json
 import logging
 import os
 
-from .wireguard import Network
+from .wireguard import Interface
 
 _VERSION_SERIAL = 1
 
@@ -23,7 +23,7 @@ class Config:
         return cls._instance
 
     def _setup(self):
-        self.networks: dict[int, Network] = {}
+        self.networks: dict[int, Interface] = {}
         os.makedirs(_CONFIG_DIR, exist_ok=True)
         self.load_networks()
 
@@ -35,7 +35,7 @@ class Config:
         if networks_json["version"] != 1:
             raise AssertionError("Incompatible config version!")
         for n in networks_json["networks"]:
-            network = Network.from_json(n)
+            network = Interface.from_json(n)
             self.networks[network.id] = network
 
     def save_networks(self):

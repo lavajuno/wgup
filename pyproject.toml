@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "wgtui"
+version = "0.0.0"
+authors = [
+    {name="Juno Meifert", email="lavajuno@proton.me"},
+]
+description = "A TUI tool for managing common WireGuard setups"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "BSD-2-Clause"
+license-files = ["LICENSE*"]
+
+[project.urls]
+Homepage = "https://github.com/lavajuno/wg-tui"
+Issues = "https://github.com/lavajuno/wg-tui/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["wgtui"]
