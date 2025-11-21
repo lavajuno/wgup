@@ -2,6 +2,7 @@ import ipaddress
 import re
 
 _REGEX_IFNAME = r"[a-z][a-z0-9_]{1,14}"
+_REGEX_NICKNAME = r"[a-z][a-z0-9_ ]{1,20}"
 
 
 class Input:
@@ -9,7 +10,9 @@ class Input:
     def get_int(cls, min_value: int | None = None, max_value: int | None = None):
         while True:
             value = input()
-            valid, reason = cls.check_int(value, min_value=min_value, max_value=max_value)
+            valid, reason = cls.check_int(
+                value, min_value=min_value, max_value=max_value
+            )
             if valid:
                 return int(value)
             else:
@@ -17,7 +20,9 @@ class Input:
                 print("Please try again:")
 
     @staticmethod
-    def check_int(value: str | int, min_value: int | None = None, max_value: int | None = None):
+    def check_int(
+        value: str | int, min_value: int | None = None, max_value: int | None = None
+    ):
         try:
             v = int(value)
             if min_value is not None and v < min_value:
@@ -50,7 +55,7 @@ class Input:
             if not optional:
                 return False, "Value is required."
         return True, ""
-    
+
     @classmethod
     def get_cidr6(cls, optional: bool = False):
         while True:
@@ -73,7 +78,7 @@ class Input:
             if not optional:
                 return False, "Value is required."
         return True, ""
-    
+
     @classmethod
     def get_iface(cls, optional: bool = False):
         while True:
@@ -90,6 +95,30 @@ class Input:
         if value:
             if not re.fullmatch(_REGEX_IFNAME, value):
                 return False, "Not a valid interface name."
+        else:
+            if not optional:
+                return False, "Value is required."
+        return True, ""
+
+    @classmethod
+    def get_peer_name(cls, optional: bool = False):
+        while True:
+            value = input()
+            valid, reason = cls.check_peer_name(value, optional=optional)
+            if valid:
+                return value
+            else:
+                print(reason)
+                print("Please try again:")
+
+    @staticmethod
+    def check_peer_name(value: str, optional: bool = False):
+        if value:
+            if not re.fullmatch(_REGEX_NICKNAME, value):
+                return (
+                    False,
+                    f"Not in {_REGEX_NICKNAME}",
+                )  # TODO improve explanation / open up nickname regex
         else:
             if not optional:
                 return False, "Value is required."

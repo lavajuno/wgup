@@ -2,8 +2,8 @@ import json
 import logging
 import os
 
-from wgtui.wireguard import Interface
 from wgtui import defaults
+from wgtui.wireguard import Interface
 
 _VERSION_SERIAL = 1
 
