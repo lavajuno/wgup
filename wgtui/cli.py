@@ -3,7 +3,7 @@ import logging
 from enum import Enum
 from typing import Any
 
-from wgtui import Config, Frontend, Interface, Peer, Wireguard
+from wgtui import Config, Interface, Peer
 from wgtui.util import Input
 
 _logger = logging.getLogger("wgtui")
@@ -130,15 +130,33 @@ class CLI:
             if iface is None:
                 print(f'[!] Interface "{args.interface}" does not exist.')
                 return 1
-            print("Are you sure you want to remove this interface?")
-            print("This operation is irreversible!")
-            print("-> (y/N):")
-            if input().lower() == "y":
-                del c.interfaces[args.interface]
-                print(f'Removed interface "{args.interface}".')
-                c.save()
-            else:
-                print("[!] Operation cancelled by user. No action taken.")
+            if not args.force:
+                print("Are you sure you want to remove this interface?")
+                print("This operation is irreversible!")
+                print("-> (y/N):")
+                if input().lower() != "y":
+                    print("[!] Operation cancelled by user. No action taken.")
+                    return 1
+            del c.interfaces[args.interface]
+            print(f'Removed interface "{args.interface}".')
+            c.save()
+            return 0
+
+        @staticmethod
+        def export(args: argparse.Namespace):
+            c = Config()
+            iface = c.interfaces.get(args.interface)
+            if iface is None:
+                print(f'[!] Interface "{args.interface}" does not exist.')
+                return 1
+            iface_conf = iface.get_config()
+            filename = f"{str(args.path).rstrip("/")}/{args.interface}.conf"
+            try:
+                with open(filename, "w") as f:
+                    f.write(iface_conf)
+                print(f'[i] Wrote "{filename}"')
+            except Exception as e:
+                print(f'[i] Could not write "{filename}": {str(e)}')
                 return 1
             return 0
 
@@ -236,7 +254,51 @@ class CLI:
 
         @staticmethod
         def show(args: argparse.Namespace):
-            pass
+            c = Config()
+            iface = c.interfaces.get(args.interface)
+            if iface is None:
+                print(f'[!] Interface "{args.interface}" does not exist.')
+                return 1
+            peer = iface.peers.get(args.peer)
+            if peer is None:
+                print(f'[!] Peer "{args.peer}" does not exist.')
+                return 1
+            print(f'[i] Showing peer "{args.peer}" (on interface {args.interface}).')
+            print(_FMT_ATTRS.format("Public Key", peer.public_key))
+            print(_FMT_ATTRS.format("IPv4 CIDR", peer.cidr4))
+            print(_FMT_ATTRS.format("IPv6 CIDR", peer.cidr6))
+            return 0
+
+        @staticmethod
+        def export(args: argparse.Namespace):
+            c = Config()
+            iface = c.interfaces.get(args.interface)
+            if iface is None:
+                print(f'[!] Interface "{args.interface}" does not exist.')
+                return 1
+            peer = iface.peers.get(args.peer)
+            if peer is None:
+                print(f'[!] Peer "{args.peer}" does not exist.')
+                return 1
+            peer_conf = peer.get_config(
+                vpn_cidr4=iface.vpn_cidr4,
+                vpn_cidr6=iface.vpn_cidr6,
+                nat_cidr4=iface.nat_cidr4,
+                nat_cidr6=iface.nat_cidr6,
+                endpoint_public_key=iface.public_key,
+                endpoint_host=iface.host,
+            )
+            if args.filename:
+                try:
+                    with open(args.filename, "w") as f:
+                        f.write(peer_conf)
+                    print(f'[i] Wrote "{args.filename}"')
+                except Exception as e:
+                    print(f'[i] Could not write "{args.filename}": {str(e)}')
+            else:
+                print(peer_conf)
+                return 1
+            return 0
 
         @staticmethod
         def edit(args: argparse.Namespace):
@@ -244,7 +306,22 @@ class CLI:
 
         @staticmethod
         def remove(args: argparse.Namespace):
-            pass
+            c = Config()
+            iface = c.interfaces.get(args.interface)
+            if iface is None:
+                print(f'[!] Interface "{args.interface}" does not exist.')
+                return 1
+            if not args.force:
+                print("Are you sure you want to remove this interface?")
+                print("This operation is irreversible!")
+                print("-> (y/N):")
+                if input().lower() != "y":
+                    print("[!] Operation cancelled by user. No action taken.")
+                    return 1
+            del c.interfaces[args.interface]
+            print(f'Removed interface "{args.interface}".')
+            c.save()
+            return 0
 
         @staticmethod
         def rekey(args: argparse.Namespace):
@@ -292,6 +369,17 @@ class CLI:
         )
         interface_remove.set_defaults(func=CLI.Interface.remove)
         interface_remove.add_argument("interface", type=str)
+        interface_remove.add_argument("--force", action="store_true")
+
+        # interface.export
+        interface_export = interface_sub.add_parser(
+            "export", help="Export config file for an interface"
+        )
+        interface_export.set_defaults(func=CLI.Interface.export)
+        interface_export.add_argument("interface", type=str)
+        interface_export.add_argument(
+            "-p", "--path", type=str, default="/etc/wireguard"
+        )
 
         # interface.up
         interface_up = interface_sub.add_parser("up", help="Bring an interface up")
@@ -326,20 +414,35 @@ class CLI:
         peer_sub = peer.add_subparsers()
 
         # peer.ls
-        peer_ls = peer_sub.add_parser("ls")
+        peer_ls = peer_sub.add_parser("ls", help="Show peers defined for an interface")
         peer_ls.set_defaults(func=CLI.Peer.ls)
         peer_ls.add_argument("interface", type=str)
 
         # peer.create
-        peer_create = peer_sub.add_parser("create")
+        peer_create = peer_sub.add_parser(
+            "create", help="Create a new peer for the given interface"
+        )
         peer_create.set_defaults(func=CLI.Peer.create)
         peer_create.add_argument("interface", type=str)
         peer_create.add_argument("-i", "--interactive", action="store_true")
         peer_create.add_argument("--name", type=str, default="")
         peer_create.add_argument("--cidr4", type=str, default="")
         peer_create.add_argument("--cidr6", type=str, default="")
+
         # peer.show
-        peer_show = peer_sub.add_parser("show")
+        peer_show = peer_sub.add_parser("show", help="Show details for a peer")
+        peer_show.set_defaults(func=CLI.Peer.show)
+        peer_show.add_argument("interface", type=str)
+        peer_show.add_argument("peer", type=str)
+
+        # peer.export
+        peer_export = peer_sub.add_parser(
+            "export", help="Export config file for a peer"
+        )
+        peer_export.set_defaults(func=CLI.Peer.export)
+        peer_export.add_argument("interface", type=str)
+        peer_export.add_argument("peer", type=str)
+        peer_export.add_argument("-f", "--filename", type=str)
 
         # peer.edit
         peer_edit = peer_sub.add_parser("edit")
