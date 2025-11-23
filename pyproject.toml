@@ -3,24 +3,26 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "wgtui"
+name = "wgup"
 version = "0.0.0"
 authors = [
     {name="Juno Meifert", email="lavajuno@proton.me"},
 ]
-description = "A TUI tool for managing common WireGuard setups"
+description = "Scriptable shortcuts for managing Wireguard interfaces."
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
+    "Operating System :: POSIX :: Linux",
+    "Development Status :: 2 - Pre-Alpha",
+    "Topic :: Utilities"
 ]
 license = "BSD-2-Clause"
 license-files = ["LICENSE*"]
 
 [project.urls]
-Homepage = "https://github.com/lavajuno/wg-tui"
-Issues = "https://github.com/lavajuno/wg-tui/issues"
+Homepage = "https://github.com/lavajuno/wgup"
+Issues = "https://github.com/lavajuno/wgup/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["wgtui"]
+packages = ["wgup"]

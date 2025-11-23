@@ -1,7 +1,7 @@
 import json
 import subprocess
 
-from wgtui.util import IP
+from wgup.util import IP
 
 CONFIG_FW_VPN_FWD = """
 # Firewall: Allow traffic flow within VPN interface

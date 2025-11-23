@@ -1,8 +1,8 @@
 import json
 from unittest import TestCase
 
-from wgtui import wireguard
-from wgtui.util import IP
+from wgup import wireguard
+from wgup.util import IP
 
 
 class TestWireguard(TestCase):

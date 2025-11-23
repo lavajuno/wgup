@@ -3,9 +3,9 @@ import logging
 from enum import Enum
 from typing import Any
 
-from wgtui import wireguard
-from wgtui.config import Config
-from wgtui.util import IP, Input, InterfaceNotFoundException, PeerNotFoundException
+from wgup import wireguard
+from wgup.config import Config
+from wgup.util import IP, Input, InterfaceNotFoundException, PeerNotFoundException
 
 _logger = logging.getLogger("wgtui")
 

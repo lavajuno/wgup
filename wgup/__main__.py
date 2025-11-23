@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from wgtui.cli import CLI
+from wgup.cli import CLI
 
 _logger = logging.getLogger("wgtui")
 _logger.setLevel(logging.INFO)
