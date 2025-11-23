@@ -1,5 +1,3 @@
-import argparse
-import ipaddress
 import json
 import subprocess
 
@@ -54,10 +52,10 @@ PresharedKey = {preshared_key}
 AllowedIPs = {cidr4}
 AllowedIPs = {cidr6}
 Endpoint = {endpoint}
-PersistentKeepalive = 1
+PersistentKeepalive = 10  # Keeps peers behind NATs accessible
 """
 
-CONFIG_NETWORK_HEADER = """
+CONFIG_INTERFACE_HEADER = """
 [Interface]
 PrivateKey = {private_key}
 Address = {cidr4}
@@ -65,7 +63,7 @@ Address = {cidr6}
 ListenPort = {port}
 """
 
-CONFIG_NETWORK_PEER = """
+CONFIG_INTERFACE_PEER = """
 [Peer]
 PublicKey = {public_key}
 PresharedKey = {preshared_key}
@@ -74,7 +72,7 @@ AllowedIPs = {cidr6}
 """
 
 
-class Wireguard:
+class CommandLine:
     @staticmethod
     def generate_private_key() -> str:
         result = subprocess.run(["wg", "genkey"], stdout=subprocess.PIPE)
@@ -96,7 +94,7 @@ class Wireguard:
         return result.stdout.decode("utf-8").strip()
 
     @staticmethod
-    def ifup(if_name: str):
+    def service_up(if_name: str):
         subprocess.run(
             ["sudo", "systemctl", "enable", "wg-quick@{}".format(if_name)],
         ).check_returncode()
@@ -105,7 +103,7 @@ class Wireguard:
         ).check_returncode()
 
     @staticmethod
-    def ifdown(if_name: str):
+    def service_down(if_name: str):
         subprocess.run(
             ["sudo", "systemctl", "disable", "wg-quick@{}".format(if_name)],
         ).check_returncode()
@@ -114,7 +112,7 @@ class Wireguard:
         ).check_returncode()
 
     @staticmethod
-    def reload(if_name: str):
+    def service_reload(if_name: str):
         subprocess.run(
             ["sudo", "systemctl", "reload", "wg-quick@{}".format(if_name)],
         ).check_returncode()
@@ -140,9 +138,9 @@ class Peer:
 
     @classmethod
     def create(cls, *, name: str, cidr4: str, cidr6: str):
-        private_key = Wireguard.generate_private_key()
-        public_key = Wireguard.generate_public_key(private_key)
-        preshared_key = Wireguard.generate_preshared_key()
+        private_key = CommandLine.generate_private_key()
+        public_key = CommandLine.generate_public_key(private_key)
+        preshared_key = CommandLine.generate_preshared_key()
         return cls(
             name=name,
             private_key=private_key,
@@ -151,6 +149,11 @@ class Peer:
             cidr4=cidr4,
             cidr6=cidr6,
         )
+
+    def rekey(self):
+        self.private_key = CommandLine.generate_private_key()
+        self.public_key = CommandLine.generate_public_key(self.private_key)
+        self.preshared_key = CommandLine.generate_preshared_key()
 
     def __get_peer_header(self) -> str:
         return CONFIG_PEER_HEADER.format(
@@ -269,16 +272,16 @@ class Interface:
         host: str,
         port: int,
     ):
-        private_key = Wireguard.generate_private_key()
-        public_key = Wireguard.generate_public_key(private_key)
+        private_key = CommandLine.generate_private_key()
+        public_key = CommandLine.generate_public_key(private_key)
         return cls(
             private_key=private_key,
             public_key=public_key,
             vpn_iface=vpn_iface,
             vpn_cidr4=vpn_cidr4,
             vpn_cidr6=vpn_cidr6,
-            addr4=IP.nth_addr4(vpn_cidr4, 0),
-            addr6=IP.nth_addr6(vpn_cidr6, 0),
+            addr4=IP.server_addr4(vpn_cidr4),
+            addr6=IP.server_addr6(vpn_cidr6),
             host=host,
             port=port,
         )
@@ -299,7 +302,7 @@ class Interface:
         )
 
     def __get_network_header(self) -> str:
-        return CONFIG_NETWORK_HEADER.format(
+        return CONFIG_INTERFACE_HEADER.format(
             private_key=self.private_key,
             cidr4=self.addr4,
             cidr6=self.addr6,
@@ -308,7 +311,7 @@ class Interface:
 
     def __get_peers_config(self):
         return "".join(
-            CONFIG_NETWORK_PEER.format(
+            CONFIG_INTERFACE_PEER.format(
                 public_key=peer.public_key,
                 preshared_key=peer.preshared_key,
                 cidr4=peer.cidr4,
@@ -347,7 +350,7 @@ class Interface:
             "nat_iface": self.nat_iface,
             "nat_cidr4": self.nat_cidr4,
             "nat_cidr6": self.nat_cidr6,
-            "peers": list(p.to_json() for p in self.peers.values()),
+            "peers": list(p[1].to_json() for p in sorted(self.peers.items())),
         }
 
     @classmethod
@@ -371,51 +374,3 @@ class Interface:
             nat_cidr6=data["nat_cidr6"],
             peers=peers,
         )
-
-
-if __name__ == "__main__":
-    p = Peer(
-        name="testpeer",
-        private_key="peer_private_key",
-        public_key="peer_public_key",
-        preshared_key="peer_preshared_key",
-        cidr4="192.168.254.2/24",
-        cidr6="fdfe::2/64",
-    )
-    n = Interface(
-        private_key="privkey",
-        public_key="pubkey",
-        vpn_iface="vpn",
-        vpn_cidr4="192.168.254.0/24",
-        vpn_cidr6="fdfe::/64",
-        addr4="192.168.254.1/24",
-        addr6="fdfe::1/64",
-        host="vpn.local",
-        port=12345,
-        nat_iface="eth0",
-        nat_cidr4=["0.0.0.0/0"],
-        nat_cidr6=["::/0"],
-        peers={"test": p},
-    )
-
-    print(n.get_config())
-
-    print(
-        p.get_config(
-            vpn_cidr4="192.168.254.0/24",
-            vpn_cidr6="fdfe::/64",
-            nat_cidr4=["0.0.0.0/0"],
-            nat_cidr6=["::/64"],
-            endpoint_public_key="endpoint_pubkey",
-            endpoint_host="vpn.local",
-        )
-    )
-
-    k = Wireguard.generate_private_key()
-    p = Wireguard.generate_public_key(k)
-    s = Wireguard.generate_preshared_key()
-    print(k)
-    print(p)
-    print(s)
-
-    print(json.dumps(n.to_json(), indent=4))

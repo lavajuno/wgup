@@ -3,8 +3,9 @@ import logging
 from enum import Enum
 from typing import Any
 
-from wgtui import Config, Interface, Peer
-from wgtui.util import Input
+from wgtui import wireguard
+from wgtui.config import Config
+from wgtui.util import IP, Input, InterfaceNotFoundException, PeerNotFoundException
 
 _logger = logging.getLogger("wgtui")
 
@@ -21,7 +22,26 @@ class CLI:
                 return False
         return True
 
-    class Interface:
+    class Iface:
+        class Attributes(Enum):
+            NAME = "name"
+            HOST = "host"
+            PORT = "port"
+
+        @staticmethod
+        def _get(c: Config, args: argparse.Namespace):
+            """
+            This function intentionally uses args instead of the name of the
+            interface to ensure that positional arguments are consistent across
+            subcommands.
+            """
+            iface = c.interfaces.get(args.interface)
+            if iface is None:
+                raise InterfaceNotFoundException(
+                    f'[!] Interface "{args.interface}" does not exist.'
+                )
+            return iface
+
         @staticmethod
         def ls(_: argparse.Namespace):
             c = Config()
@@ -36,62 +56,48 @@ class CLI:
         @staticmethod
         def create(args: argparse.Namespace):
             c = Config()
-            if args.interactive:
-                print("[i] Creating a new VPN interface.")
-                print('-> Enter VPN interface name (ex. "wgchangeme"):')
-                iface_name = Input.get_iface()
-                if c.interfaces.get(iface_name):
-                    print(
-                        "An interface with this name already exists! Please choose a different name."
-                    )
-                    return 1
-                print('-> Enter VPN IPv4 block (ex. "169.254.0.0/16"):')
-                cidr4 = Input.get_cidr4()
-                print('-> Enter VPN IPv6 block (ex. "2001:db8::/64"):')
-                cidr6 = Input.get_cidr6()
-                print('-> Enter port peers will use to connect (ex. "12345"):')
-                port = Input.get_int(min_value=1, max_value=65535)
+            # sanitize params
+            # TODO(lavajuno): write library for command line forms
+            iface_name = str(args.name)
+            valid, reason = Input.check_iface(iface_name)
+            if not valid:
+                print("[!] Interface name is invalid:")
+                print(reason)
+                return 1
+            if c.interfaces.get(iface_name):
                 print(
-                    '-> Enter hostname/address peers will use to connect (ex. "vpn.example.com"):'
+                    "[!] An interface with this name already exists! Please choose a different name."
                 )
-                host = Input.get_str(optional=True)
-            else:
-                # sanitize params
-                # TODO(lavajuno): write library for command line forms
-                iface_name = str(args.name)
-                valid, reason = Input.check_iface(iface_name)
-                if not valid:
-                    print("[!] Interface name is invalid:")
-                    print(reason)
-                    return 1
-                if c.interfaces.get(iface_name):
-                    print(
-                        "[!] An interface with this name already exists! Please choose a different name."
-                    )
-                    return 1
-                cidr4 = str(args.cidr4)
+                return 1
+            cidr4 = str(args.cidr4)
+            if cidr4:
                 valid, reason = Input.check_cidr4(cidr4)
                 if not valid:
                     print("[!] IPv4 CIDR block is invalid:")
                     print(reason)
                     return 1
-                cidr6 = str(args.cidr6)
+            else:
+                cidr4 = IP.auto_cidr4()
+            cidr6 = str(args.cidr6)
+            if cidr6:
                 valid, reason = Input.check_cidr6(cidr6)
                 if not valid:
                     print("[!] IPv4 CIDR block is invalid:")
                     print(reason)
                     return 1
-                port = int(args.port)
-                valid, reason = Input.check_int(port, min_value=1, max_value=65535)
-                if not valid:
-                    print("[!] Port is invalid:")
-                    print(reason)
-                    return 1
-                host = str(args.host)
-                if not host:
-                    print("[!] Host is required.")
-                    return 1
-            iface = Interface.create(
+            else:
+                cidr6 = IP.auto_cidr6()
+            port = int(args.port)
+            valid, reason = Input.check_int(port, min_value=1, max_value=65535)
+            if not valid:
+                print("[!] Port is invalid:")
+                print(reason)
+                return 1
+            host = str(args.host)
+            if not host:
+                print("[!] Host is required.")
+                return 1
+            iface = wireguard.Interface.create(
                 vpn_iface=iface_name,
                 vpn_cidr4=cidr4,
                 vpn_cidr6=cidr6,
@@ -103,13 +109,10 @@ class CLI:
             print(f'[i] Created interface "{iface_name}".')
             return 0
 
-        @staticmethod
-        def show(args: argparse.Namespace):
+        @classmethod
+        def show(cls, args: argparse.Namespace):
             c = Config()
-            iface = c.interfaces.get(args.interface)
-            if iface is None:
-                print(f'[!] Interface "{args.interface}" does not exist.')
-                return 1
+            iface = cls._get(c, args.interface)
             print(f'[i] Showing interface "{iface.vpn_iface}".')
             print(_FMT_ATTRS.format("Public Key", iface.public_key))
             print(_FMT_ATTRS.format("VPN IPv4 Pool", iface.vpn_cidr4))
@@ -119,17 +122,39 @@ class CLI:
             )
             return 0
 
-        @staticmethod
-        def edit(args: argparse.Namespace):
-            pass
-
-        @staticmethod
-        def remove(args: argparse.Namespace):
+        @classmethod
+        def set(cls, args: argparse.Namespace):
             c = Config()
-            iface = c.interfaces.get(args.interface)
-            if iface is None:
-                print(f'[!] Interface "{args.interface}" does not exist.')
-                return 1
+            iface = cls._get(c, args)
+            match args.attribute:
+                case cls.Attributes.NAME.value:
+                    raise NotImplementedError
+                case cls.Attributes.HOST.value:
+                    iface.host = args.value
+                case cls.Attributes.PORT.value:
+                    valid, reason = Input.check_int(
+                        args.value, min_value=1, max_value=65535
+                    )
+                    if not valid:
+                        print("[!] Port is invalid:")
+                        print(reason)
+                        return 1
+                    iface.port = int(args.value)
+                case _:
+                    print(
+                        f"[!] Please specify one of the following attributes: {", ".join(x.value for x in cls.Attributes)}"
+                    )
+                    return 1
+            print(
+                f'[i] Set {args.attribute}="{args.value}" (interface "{args.interface}").'
+            )
+            c.save()
+            return 0
+
+        @classmethod
+        def rm(cls, args: argparse.Namespace):
+            c = Config()
+            _ = cls._get(c, args.interface)  # ignore
             if not args.force:
                 print("Are you sure you want to remove this interface?")
                 print("This operation is irreversible!")
@@ -142,10 +167,10 @@ class CLI:
             c.save()
             return 0
 
-        @staticmethod
-        def export(args: argparse.Namespace):
+        @classmethod
+        def export(cls, args: argparse.Namespace):
             c = Config()
-            iface = c.interfaces.get(args.interface)
+            iface = cls._get(c, args.interface)
             if iface is None:
                 print(f'[!] Interface "{args.interface}" does not exist.')
                 return 1
@@ -160,85 +185,105 @@ class CLI:
                 return 1
             return 0
 
-        @staticmethod
-        def up(args: argparse.Namespace):
-            pass
+        @classmethod
+        def up(cls, args: argparse.Namespace):
+            c = Config()
+            iface = cls._get(c, args)
+            wireguard.CommandLine.service_up(iface.vpn_iface)
+            return 0
 
-        @staticmethod
-        def down(args: argparse.Namespace):
-            pass
+        @classmethod
+        def down(cls, args: argparse.Namespace):
+            c = Config()
+            iface = cls._get(c, args)
+            wireguard.CommandLine.service_down(iface.vpn_iface)
+            return 0
 
-        @staticmethod
-        def enable(args: argparse.Namespace):
-            pass
-
-        @staticmethod
-        def disable(args: argparse.Namespace):
-            pass
-
-        @staticmethod
-        def restart(args: argparse.Namespace):
-            pass
-
-        @staticmethod
-        def reload(args: argparse.Namespace):
-            pass
+        @classmethod
+        def reload(cls, args: argparse.Namespace):
+            c = Config()
+            iface = cls._get(c, args)
+            wireguard.CommandLine.service_reload(iface.vpn_iface)
+            return 0
 
     class Peer:
+        class Attributes(Enum):
+            CIDR4 = "cidr4"
+            CIDR6 = "cidr6"
+
         @staticmethod
-        def create(args: argparse.Namespace):
+        def _get(c: Config, args: argparse.Namespace):
+            """
+            This function intentionally uses args instead of the name of the
+            interface+peer to ensure that positional arguments are consistent
+            across subcommands.
+            """
+            iface = c.interfaces.get(args.interface)
+            if iface is None:
+                raise InterfaceNotFoundException(
+                    f'[!] Interface "{args.interface}" does not exist.'
+                )
+            peer = iface.peers.get(args.peer)
+            if peer is None:
+                raise PeerNotFoundException(f'[!] Peer "{args.peer}" does not exist.')
+            return iface, peer
+
+        @staticmethod
+        def __next_addr4(interface: wireguard.Interface):
+            peer_cidr4 = list(peer.cidr4 for peer in interface.peers.values())
+            return IP.next_addr4(interface.vpn_cidr4, peer_cidr4)
+
+        @staticmethod
+        def __next_addr6(interface: wireguard.Interface):
+            peer_cidr6 = list(peer.cidr6 for peer in interface.peers.values())
+            return IP.next_addr6(interface.vpn_cidr6, peer_cidr6)
+
+        @classmethod
+        def create(cls, args: argparse.Namespace):
             c = Config()
             if not c.interfaces.get(args.interface):
                 print(f'No such interface: "{args.interface}".')
                 return 1
             interface = c.interfaces[args.interface]
-            if args.interactive:
-                print(f'[i] Creating a new peer for interface "{args.interface}".')
-                print('-> Enter peer nickname (ex. "kitchen_pc"):')
-                peer_name = Input.get_peer_name()
-                if interface.peers.get(peer_name):
-                    print(
-                        "[!] A peer with this name already exists! Please choose a different name."
-                    )
-                    return 1
-                print('-> Enter peer IPv4 CIDR block (ex. "169.254.0.5/32"):')
-                cidr4 = Input.get_cidr4()
-                print('-> Enter peer IPv6 CIDR block (ex. "2001:db8::5/128"):')
-                cidr6 = Input.get_cidr6()
-            else:
-                # sanitize params
-                # TODO(lavajuno): write library for command line forms
-                peer_name = str(args.name)
-                valid, reason = Input.check_peer_name(peer_name)
-                if not valid:
-                    print("[!] Peer name is invalid:")
-                    print(reason)
-                    return 1
-                if interface.peers.get(peer_name):
-                    print(
-                        "[!] A peer with this name already exists! Please choose a different name."
-                    )
-                    return 1
-                cidr4 = str(args.cidr4)
+            # sanitize params
+            # TODO(lavajuno): write library for command line forms
+            peer_name = str(args.name)
+            valid, reason = Input.check_peer_name(peer_name)
+            if not valid:
+                print("[!] Peer name is invalid:")
+                print(reason)
+                return 1
+            if interface.peers.get(peer_name):
+                print(
+                    "[!] A peer with this name already exists! Please choose a different name."
+                )
+                return 1
+            cidr4 = str(args.cidr4)
+            if cidr4:
                 valid, reason = Input.check_cidr4(cidr4)
                 if not valid:
                     print("[!] IPv4 CIDR block is invalid:")
                     print(reason)
                     return 1
-                cidr6 = str(args.cidr6)
+            else:
+                cidr4 = cls.__next_addr4(interface)
+            cidr6 = str(args.cidr6)
+            if cidr6:
                 valid, reason = Input.check_cidr6(cidr6)
                 if not valid:
-                    print("[!] IPv4 CIDR block is invalid:")
+                    print("[!] IPv6 CIDR block is invalid:")
                     print(reason)
                     return 1
-            peer = Peer.create(name=peer_name, cidr4=cidr4, cidr6=cidr6)
+            else:
+                cidr6 = cls.__next_addr6(interface)
+            peer = wireguard.Peer.create(name=peer_name, cidr4=cidr4, cidr6=cidr6)
             interface.peers[peer_name] = peer
             c.save()
             print(f'[i] Created peer "{peer_name}" for interface "{args.interface}".')
             return 0
 
-        @staticmethod
-        def ls(args: argparse.Namespace):
+        @classmethod
+        def ls(cls, args: argparse.Namespace):
             c = Config()
             iface = c.interfaces.get(args.interface)
             if iface is None:
@@ -252,8 +297,8 @@ class CLI:
                 print("[i] No peers have been defined for this interface.")
             return 0
 
-        @staticmethod
-        def show(args: argparse.Namespace):
+        @classmethod
+        def show(cls, args: argparse.Namespace):
             c = Config()
             iface = c.interfaces.get(args.interface)
             if iface is None:
@@ -269,8 +314,8 @@ class CLI:
             print(_FMT_ATTRS.format("IPv6 CIDR", peer.cidr6))
             return 0
 
-        @staticmethod
-        def export(args: argparse.Namespace):
+        @classmethod
+        def export(cls, args: argparse.Namespace):
             c = Config()
             iface = c.interfaces.get(args.interface)
             if iface is None:
@@ -300,32 +345,64 @@ class CLI:
                 return 1
             return 0
 
-        @staticmethod
-        def edit(args: argparse.Namespace):
-            pass
-
-        @staticmethod
-        def remove(args: argparse.Namespace):
+        @classmethod
+        def set(cls, args: argparse.Namespace):
             c = Config()
-            iface = c.interfaces.get(args.interface)
-            if iface is None:
-                print(f'[!] Interface "{args.interface}" does not exist.')
-                return 1
+            _, peer = cls._get(c, args)
+            match args.attribute:
+                case cls.Attributes.CIDR4.value:
+                    # TODO ensure CIDRs are in network and unused
+                    valid, reason = Input.check_cidr4(args.value)
+                    if not valid:
+                        print("[!] IPv4 CIDR block is invalid:")
+                        print(reason)
+                        return 1
+                    peer.cidr4 = args.value
+                case cls.Attributes.CIDR6.value:
+                    valid, reason = Input.check_cidr6(args.value)
+                    if not valid:
+                        print("[!] IPv6 CIDR block is invalid:")
+                        print(reason)
+                        return 1
+                    peer.cidr6 = args.value
+                case _:
+                    print(
+                        f"[!] Please specify one of the following attributes: {", ".join(x.value for x in cls.Attributes)}"
+                    )
+                    return 1
+            print(
+                f'[i] Set {args.attribute}="{args.value}" (peer "{args.peer}" on {args.interface}).'
+            )
+            c.save()
+            return 0
+
+        @classmethod
+        def rm(cls, args: argparse.Namespace):
+            c = Config()
+            iface, _ = cls._get(c, args.interface)
             if not args.force:
-                print("Are you sure you want to remove this interface?")
+                print("Are you sure you want to remove this peer?")
                 print("This operation is irreversible!")
                 print("-> (y/N):")
                 if input().lower() != "y":
                     print("[!] Operation cancelled by user. No action taken.")
                     return 1
-            del c.interfaces[args.interface]
-            print(f'Removed interface "{args.interface}".')
+            del iface.peers[args.peer]
+            print(f'Removed peer "{args.peer}" (on {args.interface}).')
             c.save()
             return 0
 
-        @staticmethod
-        def rekey(args: argparse.Namespace):
-            pass
+        @classmethod
+        def rekey(cls, args: argparse.Namespace):
+            c = Config()
+            _, peer = cls._get(c, args)
+            peer.rekey()
+            c.save()
+            print(f'[i] Rekeyed peer "{args.peer}" (on {args.interface}).')
+            print(
+                "    Please export the peer's config again to connect using the new keys."
+            )
+            return 0
 
     @staticmethod
     def get_parser():
@@ -333,81 +410,65 @@ class CLI:
         root = argparse.ArgumentParser()
         root_sub = root.add_subparsers(title="subcommands", required=True)
 
-        # interface.*
-        interface = root_sub.add_parser("interface", help="Manage interfaces")
-        interface_sub = interface.add_subparsers(title="subcommands", required=True)
+        # iface.*
+        iface = root_sub.add_parser("iface", help="Manage interfaces")
+        iface_sub = iface.add_subparsers(title="subcommands", required=True)
 
-        # interface.ls
-        interface_ls = interface_sub.add_parser("ls", help="List all interfaces")
-        interface_ls.set_defaults(func=CLI.Interface.ls)
+        # iface.ls
+        interface_ls = iface_sub.add_parser("ls", help="List all interfaces")
+        interface_ls.set_defaults(func=CLI.Iface.ls)
 
-        # interface.create
-        interface_create = interface_sub.add_parser(
-            "create", help="Create an interface"
-        )
-        interface_create.set_defaults(func=CLI.Interface.create)
-        interface_create.add_argument("-i", "--interactive", action="store_true")
-        interface_create.add_argument("--name", type=str, default="")
-        interface_create.add_argument("--cidr4", type=str, default="")
-        interface_create.add_argument("--cidr6", type=str, default="")
-        interface_create.add_argument("--host", type=str, default="")
-        interface_create.add_argument("--port", type=int, default=0)
+        # iface.create
+        iface_create = iface_sub.add_parser("create", help="Create an interface")
+        iface_create.set_defaults(func=CLI.Iface.create)
+        iface_create.add_argument("name", type=str, default="")
+        iface_create.add_argument("--cidr4", type=str, default="")
+        iface_create.add_argument("--cidr6", type=str, default="")
+        iface_create.add_argument("--host", type=str, default="")
+        iface_create.add_argument("--port", type=int, default=0)
 
-        # interface.show
-        interface_show = interface_sub.add_parser(
-            "show", help="Show details for an interface"
-        )
-        interface_show.set_defaults(func=CLI.Interface.show)
-        interface_show.add_argument("interface", type=str)
+        # iface.show
+        iface_show = iface_sub.add_parser("show", help="Show details for an interface")
+        iface_show.set_defaults(func=CLI.Iface.show)
+        iface_show.add_argument("interface", type=str)
 
-        # interface.edit
-        interface_edit = interface_sub.add_parser("edit", help="Edit an interface")
+        # iface.set
+        iface_set = iface_sub.add_parser("set", help="Set parameters for an interface")
 
-        # interface.remove
-        interface_remove = interface_sub.add_parser(
-            "remove", help="Remove an interface"
-        )
-        interface_remove.set_defaults(func=CLI.Interface.remove)
-        interface_remove.add_argument("interface", type=str)
-        interface_remove.add_argument("--force", action="store_true")
+        # iface.remove
+        iface_rm = iface_sub.add_parser("rm", help="Remove an interface")
+        iface_rm.set_defaults(func=CLI.Iface.rm)
+        iface_rm.add_argument("interface", type=str)
+        iface_rm.add_argument("--force", action="store_true")
 
-        # interface.export
-        interface_export = interface_sub.add_parser(
+        # iface.export
+        iface_export = iface_sub.add_parser(
             "export", help="Export config file for an interface"
         )
-        interface_export.set_defaults(func=CLI.Interface.export)
-        interface_export.add_argument("interface", type=str)
-        interface_export.add_argument(
-            "-p", "--path", type=str, default="/etc/wireguard"
-        )
+        iface_export.set_defaults(func=CLI.Iface.export)
+        iface_export.add_argument("interface", type=str)
+        iface_export.add_argument("-p", "--path", type=str, default="/etc/wireguard")
 
-        # interface.up
-        interface_up = interface_sub.add_parser("up", help="Bring an interface up")
-
-        # interface.down
-        interface_down = interface_sub.add_parser(
-            "down", help="Bring an interface down"
+        # iface.up
+        iface_up = iface_sub.add_parser(
+            "up", help="Bring an interface up and enable its systemd target"
         )
+        iface_up.set_defaults(func=CLI.Iface.up)
+        iface_up.add_argument("interface", type=str)
 
-        # interface.enable
-        interface_enable = interface_sub.add_parser(
-            "enable", help="Enable the systemd target for an interface"
+        # iface.down
+        iface_down = iface_sub.add_parser(
+            "down", help="Bring an interface down and disable its systemd target"
         )
+        iface_down.set_defaults(func=CLI.Iface.down)
+        iface_down.add_argument("interface", type=str)
 
-        # interface.disable
-        interface_disable = interface_sub.add_parser(
-            "disable", help="Disable the systemd target for an interface"
+        # iface.reload
+        iface_reload = iface_sub.add_parser(
+            "reload", help="Tell systemd to reload an interface's config"
         )
-
-        # interface.restart
-        interface_restart = interface_sub.add_parser(
-            "restart", help="Restart an interface managed by systemd"
-        )
-
-        # interface.reload
-        interface_reload = interface_sub.add_parser(
-            "reload", help="Reload an interface's config with systemd"
-        )
+        iface_reload.set_defaults(func=CLI.Iface.reload)
+        iface_reload.add_argument("interface", type=str)
 
         # peer.*
         peer = root_sub.add_parser("peer", help="Manage peers")
@@ -424,8 +485,7 @@ class CLI:
         )
         peer_create.set_defaults(func=CLI.Peer.create)
         peer_create.add_argument("interface", type=str)
-        peer_create.add_argument("-i", "--interactive", action="store_true")
-        peer_create.add_argument("--name", type=str, default="")
+        peer_create.add_argument("name", type=str, default="")
         peer_create.add_argument("--cidr4", type=str, default="")
         peer_create.add_argument("--cidr6", type=str, default="")
 
@@ -444,13 +504,25 @@ class CLI:
         peer_export.add_argument("peer", type=str)
         peer_export.add_argument("-f", "--filename", type=str)
 
-        # peer.edit
-        peer_edit = peer_sub.add_parser("edit")
+        # peer.set
+        peer_set = peer_sub.add_parser("set")
+        peer_set.set_defaults(func=CLI.Peer.set)
+        peer_set.add_argument("interface", type=str)
+        peer_set.add_argument("peer", type=str)
+        peer_set.add_argument("attribute", type=str)
+        peer_set.add_argument("value", type=str)
 
-        # peer.remove
-        peer_remove = peer_sub.add_parser("remove")
+        # peer.rm
+        peer_rm = peer_sub.add_parser("rm")
+        peer_rm.set_defaults(func=CLI.Peer.rm)
+        peer_rm.add_argument("interface", type=str)
+        peer_rm.add_argument("peer", type=str)
+        peer_rm.add_argument("--force", action="store_true")
 
         # peer.rekey
         peer_rekey = peer_sub.add_parser("rekey")
+        peer_rekey.set_defaults(func=CLI.Peer.rekey)
+        peer_rekey.add_argument("interface", type=str)
+        peer_rekey.add_argument("peer", type=str)
 
         return root  # parser

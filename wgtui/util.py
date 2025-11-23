@@ -1,24 +1,21 @@
 import ipaddress
+import random
 import re
+import string
 
-_REGEX_IFNAME = r"[a-z][a-z0-9_]{1,14}"
-_REGEX_NICKNAME = r"[a-z][a-z0-9_ ]{1,20}"
+_REGEX_IFNAME = r"[a-zA-Z][a-zA-Z0-9_]{1,14}"
+_REGEX_NICKNAME = r"[a-zA-Z][a-zA-Z0-9_]{1,20}"
+
+
+class InterfaceNotFoundException(Exception):
+    pass
+
+
+class PeerNotFoundException(Exception):
+    pass
 
 
 class Input:
-    @classmethod
-    def get_int(cls, min_value: int | None = None, max_value: int | None = None):
-        while True:
-            value = input()
-            valid, reason = cls.check_int(
-                value, min_value=min_value, max_value=max_value
-            )
-            if valid:
-                return int(value)
-            else:
-                print(reason)
-                print("Please try again:")
-
     @staticmethod
     def check_int(
         value: str | int, min_value: int | None = None, max_value: int | None = None
@@ -33,17 +30,6 @@ class Input:
             return False, "Value is not an integer."
         return True, ""
 
-    @classmethod
-    def get_cidr4(cls, optional: bool = False):
-        while True:
-            value = input()
-            valid, reason = cls.check_cidr4(value, optional=optional)
-            if valid:
-                return value
-            else:
-                print(reason)
-                print("Please try again:")
-
     @staticmethod
     def check_cidr4(value: str, optional: bool = False):
         if value:
@@ -55,17 +41,6 @@ class Input:
             if not optional:
                 return False, "Value is required."
         return True, ""
-
-    @classmethod
-    def get_cidr6(cls, optional: bool = False):
-        while True:
-            value = input()
-            valid, reason = cls.check_cidr6(value, optional=optional)
-            if valid:
-                return value
-            else:
-                print(reason)
-                print("Please try again:")
 
     @staticmethod
     def check_cidr6(value: str, optional: bool = False):
@@ -79,17 +54,6 @@ class Input:
                 return False, "Value is required."
         return True, ""
 
-    @classmethod
-    def get_iface(cls, optional: bool = False):
-        while True:
-            value = input()
-            valid, reason = cls.check_iface(value, optional=optional)
-            if valid:
-                return value
-            else:
-                print(reason)
-                print("Please try again:")
-
     @staticmethod
     def check_iface(value: str, optional: bool = False):
         if value:
@@ -99,17 +63,6 @@ class Input:
             if not optional:
                 return False, "Value is required."
         return True, ""
-
-    @classmethod
-    def get_peer_name(cls, optional: bool = False):
-        while True:
-            value = input()
-            valid, reason = cls.check_peer_name(value, optional=optional)
-            if valid:
-                return value
-            else:
-                print(reason)
-                print("Please try again:")
 
     @staticmethod
     def check_peer_name(value: str, optional: bool = False):
@@ -124,35 +77,80 @@ class Input:
                 return False, "Value is required."
         return True, ""
 
-    @staticmethod
-    def get_str(
-        optional: bool = False,
-        min_length: int | None = None,
-        max_length: int | None = None,
-    ):
-        while True:
-            value = input()
-            valid = True
-            if value:
-                if min_length is not None and len(value) < min_length:
-                    print(f"Too short (minimum length is {min_length}).")
-                if max_length is not None and len(value) > max_length:
-                    print(f"Too long (maximum length is {max_length}).")
-            else:
-                if not optional:
-                    print("Value is required.")
-                    valid = False
-            if valid:
-                return value
-            else:
-                print("Please try again:")
-
 
 class IP:
     @staticmethod
-    def nth_addr4(cidr4: str, index: int):
-        return str(ipaddress.IPv4Network(cidr4)[index])
+    def server_addr4(cidr4: str):
+        mask = cidr4.split("/", 2)[1]
+        return str(ipaddress.IPv4Network(cidr4)[1]) + f"/{mask}"
 
     @staticmethod
-    def nth_addr6(cidr6: str, index: int):
-        return str(ipaddress.IPv6Network(cidr6)[index])
+    def next_addr4(interface_cidr4: str, peers_cidr4: list[str]):
+        network = ipaddress.IPv4Network(interface_cidr4)
+        pools = [network]
+        exclusions: list[ipaddress.IPv4Network] = [
+            ipaddress.IPv4Network(network[0]),
+            ipaddress.IPv4Network(network[1]),
+        ]
+        exclusions.extend(
+            ipaddress.IPv4Network(peer_cidr4) for peer_cidr4 in peers_cidr4
+        )
+        for exclusion in exclusions:
+            next_pools: list[ipaddress.IPv4Network] = []
+            for pool in pools:
+                try:
+                    next_pools.extend(pool.address_exclude(exclusion))
+                except ValueError:
+                    # peer pool not in interface pool, skip it
+                    next_pools.append(pool)
+            pools = next_pools
+        assert pools
+        return f"{str(sorted(pools)[0][0])}/32"
+
+    @staticmethod
+    def auto_cidr4():
+        """
+        Returns a random /24 of private IPv4 addresses.
+        Pool is chosen from 192.168.0.0/16, excluding 192.168.0.* to 192.168.10.*.
+        These pools are excluded because they are commonly used for home
+        networks and will likely conflict with the created VPN.
+        """
+        return f"192.168.{random.randint(11, 254)}.0/24"
+
+    @staticmethod
+    def server_addr6(cidr6: str):
+        mask = cidr6.split("/", 2)[1]
+        return str(ipaddress.IPv6Network(cidr6)[1]) + f"/{mask}"
+
+    @staticmethod
+    def next_addr6(interface_cidr6: str, peers_cidr6: list[str]):
+        network = ipaddress.IPv6Network(interface_cidr6)
+        pools = [network]
+        exclusions: list[ipaddress.IPv6Network] = [
+            ipaddress.IPv6Network(network[0]),
+            ipaddress.IPv6Network(network[1]),
+        ]
+        exclusions.extend(
+            ipaddress.IPv6Network(peer_cidr6) for peer_cidr6 in peers_cidr6
+        )
+        for exclusion in exclusions:
+            next_pools: list[ipaddress.IPv6Network] = []
+            for pool in pools:
+                try:
+                    next_pools.extend(pool.address_exclude(exclusion))
+                except ValueError:
+                    # peer pool not in interface pool, skip it
+                    next_pools.append(pool)
+            pools = next_pools
+        assert pools
+        return f"{str(sorted(pools)[0][0])}/128"
+
+    @staticmethod
+    def auto_cidr6():
+        """
+        Returns a random /64 of private IPv6 addresses.
+        """
+        rh = lambda x: "".join(
+            random.choice(string.hexdigits) for i in range(x)
+        ).lower()
+        return f"fd{rh(2)}:{rh(4)}:{rh(4)}::/64"

@@ -40,7 +40,7 @@ class Config:
     def save(self):
         interfaces_json = {
             "version": _VERSION_SERIAL,
-            "interfaces": list(n.to_json() for n in self.interfaces.values()),
+            "interfaces": list(i[1].to_json() for i in sorted(self.interfaces.items())),
         }
         with open(_CONFIG_INTERFACES, "w") as f:
             f.write(json.dumps(interfaces_json, indent=4))

@@ -3,7 +3,7 @@ from enum import Enum
 
 from .config import Config
 from .util import IP, Input
-from .wireguard import Interface, Peer, Wireguard
+from .wireguard import CommandLine, Interface, Peer
 
 _logger = logging.getLogger("wg-tui")
 
@@ -241,9 +241,9 @@ class Frontend:
         cidr6 = Input.get_cidr6(optional=True)
         id = max(net.peers.keys(), default=0) + 1
         if not cidr4:
-            cidr4 = IP.nth_addr4(net.vpn_cidr4, id) + "/32"
+            cidr4 = IP.server_addr4(net.vpn_cidr4, id) + "/32"
         if not cidr6:
-            cidr6 = IP.nth_addr6(net.vpn_cidr6, id) + "/128"
+            cidr6 = IP.server_addr6(net.vpn_cidr6, id) + "/128"
         peer = Peer.create(
             id=id,
             nickname=nickname,
