@@ -208,6 +208,7 @@ class CLI:
 
     class Peer:
         class Attributes(Enum):
+            NAME = "name"
             CIDR4 = "cidr4"
             CIDR6 = "cidr6"
 
@@ -350,6 +351,8 @@ class CLI:
             c = Config()
             _, peer = cls._get(c, args)
             match args.attribute:
+                case cls.Attributes.NAME.value:
+                    raise NotImplementedError
                 case cls.Attributes.CIDR4.value:
                     # TODO ensure CIDRs are in network and unused
                     valid, reason = Input.check_cidr4(args.value)
