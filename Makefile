@@ -7,8 +7,8 @@ clean:
 	rm -f dist/*
 
 format:
-	isort --profile black ./wgtui ./test
-	black ./wgtui ./test
+	isort --profile black ./wgup ./test
+	black ./wgup ./test
 
 test:
 	python3 -m unittest discover test

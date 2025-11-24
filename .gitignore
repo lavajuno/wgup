@@ -2,8 +2,6 @@
 venv
 env
 .env
-wg-tui.conf.json
-conf.d
 **/__pycache__
 build/
 dist/

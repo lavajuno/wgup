@@ -9,7 +9,7 @@ _VERSION_SERIAL = 1
 
 _CONFIG_INTERFACES = f"{defaults.CONFIG_DIR}/interfaces.json"
 
-_logger = logging.getLogger("wg-tui")
+_logger = logging.getLogger("wgup")
 
 
 class Config:

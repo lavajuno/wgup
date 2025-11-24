@@ -3,14 +3,18 @@
 > NOTE: This project is a very early work in progress. Features and
 > documentation WILL be missing.
 
-Scriptable shortcuts for managing Wireguard interfaces.
-Works with wg-quick to create common setups in seconds, while leaving room for
-more advanced configurations.
+Scriptable shortcuts for managing WireGuard interfaces.
+Works with [wg-quick](https://git.zx2c4.com/wireguard-tools/about/src/man/wg-quick.8)
+to create common setups in seconds, while leaving room for more advanced
+configurations.
 
 ## Features
-- Automated generation/management of keys
-- Automated IP address pool selection and assignment
-- Generates firewall rules and NATs
+- wgup handles generation and management of keys
+- wgup handles IP address pool selection and assignment
+- - Of course, you can still assign pools and IPs manually. wgup's automatic
+    assignments will work around existing manual assignments.
+- wgup generates firewall rules and NATs
+- wgup supplements core WireGuard tools -- it does not replace them.
 
 ## Dependencies
 
@@ -18,7 +22,7 @@ more advanced configurations.
 uncomment `net.ipv4.ip_forward=1` and `net.ipv6.conf.all.forwarding=1` in
 `/etc/sysctl.conf`.
 
-wg-tui requires Python >= 3.10, which is almost certainly included in your
+wgup requires Python >= 3.10, which is almost certainly included in your
 distro.
 
 **Ubuntu (22.04,24.04) / Debian (11, 12):** `wireguard-tools`
@@ -55,12 +59,29 @@ only be used to identify the peer to the host. Keys should be unique to each
 interface<->peer connection, so if the host machine is compromised, its peers
 connections to other machines are not at risk.
 
+- wgup stores its configuration in `~/.wgup`.
+
 ## Usage
+
+### Help
+
+Help (hopefully helpful) exists for wgup and all its subcommands, and may be a
+better TLDR than this README.
+
+Use the `-h` or `--help` flag with any command for help.
+
+```bash
+wgup --help
+wgup iface --help
+wgup peer --help
+wgup nat --help
+```
 
 ### Managing interfaces
 
 The following creates a new interface called "wg0". Peers will be configured to
 connect to "vpn.example.com:51820".
+
 ```bash
 wgup iface create wg0 --host vpn.example.com --port 51820
 ```
@@ -68,6 +89,7 @@ wgup iface create wg0 --host vpn.example.com --port 51820
 You may also specify IP address pools for the interface to use. If you leave
 them out, wgup will choose random private pools to reduce the chance of a
 conflict.
+
 ```bash
 wgup iface create wg0 --cidr4 172.31.0.0/24 --cidr6 2001:db8::/64 --host vpn.example.com --port 51820
 ```
@@ -76,13 +98,37 @@ wgup iface create wg0 --cidr4 172.31.0.0/24 --cidr6 2001:db8::/64 --host vpn.exa
 > in the pool, both for IPv4 and IPv6.
 
 To see the interface you just created:
+
 ```bash
 wgup iface show wg0
 ```
 
 To see all interfaces managed by wgup:
+
 ```bash
 wgup iface ls
+```
+
+To modify an interface's parameters after creating it:
+
+```bash
+wgup iface set wg0 cidr4 172.31.1.0/24
+wgup iface set wg0 cidr6 2001:db8::1/64
+wgup iface set wg0 name wg1
+```
+
+To rekey an interface (generates new keys for the interface and all its peers):
+
+```bash
+wgup iface rekey wg0
+```
+
+
+To export an interface's config for use:
+
+```bash
+wgup iface export wg0  # exports configs to /etc/wireguard by default
+wgup iface export wg0 --path /other/wireguard/config/directory
 ```
 
 ### Managing peers
@@ -104,10 +150,39 @@ If you do not specify IP addresses, wgup will choose the next available ones.
 wgup peer create wg0 laptop --cidr4 172.31.0.123/32 --cidr6 2001:db8::beef/32
 ```
 
+To see the peer you just created:
+```bash
+wgup peer show wg0 laptop
+```
 
-###
+To see all peers on "wg0":
+```bash
+wgup iface ls
+```
 
-> 
+To modify a peer's parameters after creating it:
+```bash
+wgup peer set wg0 laptop cidr4 172.31.0.5/32
+wgup peer set wg0 laptop cidr6 2001:db8::cafe/32
+wgup peer set wg0 laptop name cooler_laptop
+```
+
+To rekey a peer (generates new keys for this peer only):
+```bash
+wgup peer rekey wg0 laptop
+```
+
+To export a peer's config for use:
+
+```bash
+wgup peer export wg0 laptop  # prints to stdout by default
+wgup peer export wg0 laptop --filename laptop_wg.conf
+```
+
+### Managing NATs
+```
+TODO(2025-11-24) write NAT section
+```
 
 ## Licensing
 wgup is Free and Open Source Software, and is released under the BSD 2-Clause license. (See [`LICENSE`](LICENSE))
