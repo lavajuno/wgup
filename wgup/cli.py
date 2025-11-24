@@ -7,7 +7,7 @@ from wgup import wireguard
 from wgup.config import Config
 from wgup.util import IP, Input, InterfaceNotFoundException, PeerNotFoundException
 
-_logger = logging.getLogger("wgtui")
+_logger = logging.getLogger("wgup")
 
 _FMT_INTERFACES = "{iface:15} : {host}:{port}"
 _FMT_PEERS = "{name:20} : {cidr4:14} : {cidr6}"
@@ -112,7 +112,7 @@ class CLI:
         @classmethod
         def show(cls, args: argparse.Namespace):
             c = Config()
-            iface = cls._get(c, args.interface)
+            iface = cls._get(c, args)
             print(f'[i] Showing interface "{iface.vpn_iface}".')
             print(_FMT_ATTRS.format("Public Key", iface.public_key))
             print(_FMT_ATTRS.format("VPN IPv4 Pool", iface.vpn_cidr4))
@@ -154,7 +154,7 @@ class CLI:
         @classmethod
         def rm(cls, args: argparse.Namespace):
             c = Config()
-            _ = cls._get(c, args.interface)  # ignore
+            _ = cls._get(c, args)  # ignore
             if not args.force:
                 print("Are you sure you want to remove this interface?")
                 print("This operation is irreversible!")
@@ -170,7 +170,7 @@ class CLI:
         @classmethod
         def export(cls, args: argparse.Namespace):
             c = Config()
-            iface = cls._get(c, args.interface)
+            iface = cls._get(c, args)
             if iface is None:
                 print(f'[!] Interface "{args.interface}" does not exist.')
                 return 1

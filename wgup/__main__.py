@@ -3,7 +3,7 @@ import sys
 
 from wgup.cli import CLI
 
-_logger = logging.getLogger("wgtui")
+_logger = logging.getLogger("wgup")
 _logger.setLevel(logging.INFO)
 _stderr_handler = logging.StreamHandler()
 _stderr_handler.setLevel(logging.DEBUG)
