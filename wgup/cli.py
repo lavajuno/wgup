@@ -205,27 +205,26 @@ class CLI:
             iface = cls._get(c, args)
             wireguard.CommandLine.service_reload(iface.vpn_iface)
             return 0
-        
+
         @classmethod
         def nat_create(cls, args: argparse.Namespace):
             raise NotImplementedError
-        
+
         @classmethod
         def nat_rm(cls, args: argparse.Namespace):
             raise NotImplementedError
-        
+
         @classmethod
         def rekey(cls, args: argparse.Namespace):
             raise NotImplementedError
             c = Config()
             iface = cls._get(c, args)
             c.save()
-            print(f'[i] Rekeyed interface \"args.interface\".')
+            print(f'[i] Rekeyed interface "args.interface".')
             print(
                 "    Please export its interface and peer configs again to connect using the new keys."
             )
             return 0
-
 
     class Peer:
         class Attributes(Enum):
@@ -495,7 +494,9 @@ class CLI:
         iface_reload.add_argument("interface", type=str)
 
         # iface.rekey
-        iface_rekey = iface_sub.add_parser("rekey", help="Generate new keys for an interface and its peers")
+        iface_rekey = iface_sub.add_parser(
+            "rekey", help="Generate new keys for an interface and its peers"
+        )
         iface_rekey.set_defaults(func=CLI.Iface.rekey)
         iface_rekey.add_argument("interface", type=str)
         iface_rekey.add_argument("--force", action="store_true")
@@ -559,7 +560,7 @@ class CLI:
         # nat.*
         nat = root_sub.add_parser("nat", help="Manage NATs")
         nat_sub = nat.add_subparsers(title="subcommands", required=True)
-        
+
         # nat.create
         nat_create = nat_sub.add_parser("create", help="Create a NAT")
         nat_create.set_defaults(func=CLI.Iface.nat_create)
@@ -575,6 +576,5 @@ class CLI:
         nat_rm.add_argument("destination", type=str)
         nat_rm.add_argument("--cidr4", type=str, default="")
         nat_rm.add_argument("--cidr6", type=str, default="")
-
 
         return root  # parser
