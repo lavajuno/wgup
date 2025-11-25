@@ -11,7 +11,7 @@ configurations.
 ## Features
 - wgup handles generation and management of keys
 - wgup handles IP address pool selection and assignment
-- - Of course, you can still assign pools and IPs manually. wgup's automatic
+    - Of course, you can still assign pools and IPs manually. wgup's automatic
     assignments will work around existing manual assignments.
 - wgup generates firewall rules and NATs
 - wgup supplements core WireGuard tools -- it does not replace them.
@@ -180,8 +180,22 @@ wgup peer export wg0 laptop --filename laptop_wg.conf
 ```
 
 ### Managing NATs
+
+> NOTE: After making changes to NATs, you need to export peer configs again for
+> the new or removed routes to take effect.
+
+To NAT all traffic from "wg0" to the physical interface "eth0":
+
+```bash
+wgup nat create wg0 eth0 --cidr4 0.0.0.0/0 --cidr6 ::/0
 ```
-TODO(2025-11-24) write NAT section
+
+> You must include either an IPv4 or IPv6 destination (or both).
+
+To remove an existing NAT:
+
+```bash
+wgup nat rm wg0 eth0 --cidr4 0.0.0.0/0
 ```
 
 ## Licensing

@@ -4,9 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "wgup"
-version = "0.0.0"
+version = "0.0.0-alpha.1"
 authors = [
-    {name="Juno Meifert", email="lavajuno@proton.me"},
+    {name="Juno Meifert", email="jvmeifert@gmail.com"},
 ]
 description = "Scriptable shortcuts for managing Wireguard interfaces."
 readme = "README.md"

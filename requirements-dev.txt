@@ -2,3 +2,4 @@ black
 build
 coverage
 isort
+twine
