@@ -1,25 +1,29 @@
 import argparse
 import logging
+import sys
 from enum import Enum
 from typing import Any
 
 from wgup import defaults, wireguard
 from wgup.config import Config
-from wgup.util import IP, Input, InterfaceNotFoundException, PeerNotFoundException
+from wgup.util import (
+    IP,
+    ExitException,
+    Input,
+    InterfaceNotFoundException,
+    PeerNotFoundException,
+)
 
 _logger = logging.getLogger(defaults.PROG)
+_logger.setLevel(logging.INFO)
+_stderr_handler = logging.StreamHandler()
+_stderr_handler.setLevel(logging.DEBUG)
+_stderr_handler.setFormatter(logging.Formatter("{levelname:<8} : {message}", style="{"))
+_logger.addHandler(_stderr_handler)
 
 _FMT_INTERFACES = "{iface:15} : {host}:{port}"
 _FMT_PEERS = "{name:20} : {cidr4:14} : {cidr6}"
 _FMT_ATTRS = "{:20} : {}"
-
-
-@staticmethod
-def assert_inputs(l: list[Any]):
-    for item in l:
-        if not item:
-            return False
-    return True
 
 
 class Iface:
@@ -589,3 +593,14 @@ def get_parser():
     version.set_defaults(func=Version.display)
 
     return root  # parser
+
+
+def entrypoint():
+    parser = get_parser()
+    args = parser.parse_args(sys.argv[1:])
+    try:
+        status = int(args.func(args))
+        return status
+    except ExitException as e:
+        print(str(e))
+        return 1

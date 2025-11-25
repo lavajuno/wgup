@@ -26,3 +26,6 @@ Issues = "https://github.com/lavajuno/wgup/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["wgup"]
+
+[project.scripts]
+wgup = "wgup.cli:entrypoint"
