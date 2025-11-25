@@ -8,6 +8,12 @@ Works with [wg-quick](https://git.zx2c4.com/wireguard-tools/about/src/man/wg-qui
 to create common setups in seconds, while leaving room for more advanced
 configurations.
 
+## Installation
+
+```
+pip install wgup
+```
+
 ## Features
 - wgup handles generation and management of keys
 - wgup handles IP address pool selection and assignment
