@@ -1,10 +1,14 @@
-.PHONY: build clean format test
+.PHONY: build clean coverage format test
 
-build: clean
+build: clean format
 	python3 -m build
 
 clean:
 	rm -f dist/*
+
+coverage:
+	coverage run --source="wgup" -m unittest discover test && \
+	coverage html -d coverage.d
 
 format:
 	isort --profile black ./wgup ./test
