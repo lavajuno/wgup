@@ -7,11 +7,19 @@ _REGEX_IFNAME = r"[a-zA-Z][a-zA-Z0-9_]{1,14}"
 _REGEX_NICKNAME = r"[a-zA-Z][a-zA-Z0-9_]{1,20}"
 
 
-class InterfaceNotFoundException(Exception):
+class ExitException(Exception):
     pass
 
 
-class PeerNotFoundException(Exception):
+class ConfigVersionException(ExitException):
+    pass
+
+
+class InterfaceNotFoundException(ExitException):
+    pass
+
+
+class PeerNotFoundException(ExitException):
     pass
 
 

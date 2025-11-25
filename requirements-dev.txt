@@ -1,2 +1,4 @@
 black
+build
+coverage
 isort

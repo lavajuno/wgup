@@ -1,9 +1,10 @@
 import logging
 import sys
 
-from wgup.cli import CLI
+from wgup import cli, defaults
+from wgup.util import ExitException
 
-_logger = logging.getLogger("wgup")
+_logger = logging.getLogger(defaults.PROG)
 _logger.setLevel(logging.INFO)
 _stderr_handler = logging.StreamHandler()
 _stderr_handler.setLevel(logging.DEBUG)
@@ -12,13 +13,13 @@ _logger.addHandler(_stderr_handler)
 
 
 def main():
-    parser = CLI.get_parser()
+    parser = cli.get_parser()
     args = parser.parse_args(sys.argv[1:])
-    if args.func:
+    try:
         status = int(args.func(args))
         return status
-    else:
-        print("Please specify an action (--help for help)")
+    except ExitException as e:
+        print(str(e))
         return 1
 
 

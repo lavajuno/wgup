@@ -3,13 +3,12 @@ import logging
 import os
 
 from wgup import defaults
+from wgup.util import ConfigVersionException
 from wgup.wireguard import Interface
-
-_VERSION_SERIAL = 1
 
 _CONFIG_INTERFACES = f"{defaults.CONFIG_DIR}/interfaces.json"
 
-_logger = logging.getLogger("wgup")
+_logger = logging.getLogger(defaults.PROG)
 
 
 class Config:
@@ -32,16 +31,16 @@ class Config:
         with open(_CONFIG_INTERFACES, "rb") as f:
             networks_json = json.loads(f.read())
         if networks_json["version"] != defaults.CONFIG_VERSION:
-            raise AssertionError("Incompatible config version.")
+            raise ConfigVersionException("[!] Incompatible config version.")
         for n in networks_json["interfaces"]:
             interface = Interface.from_json(n)
             self.interfaces[interface.vpn_iface] = interface
 
     def save(self):
         interfaces_json = {
-            "version": _VERSION_SERIAL,
+            "version": defaults.CONFIG_VERSION,
             "interfaces": list(i[1].to_json() for i in sorted(self.interfaces.items())),
         }
         with open(_CONFIG_INTERFACES, "w") as f:
             f.write(json.dumps(interfaces_json, indent=4))
-        _logger.info("Saved configuration.")
+        _logger.debug("Saved configuration.")

@@ -1,5 +1,6 @@
 import os
 
+PROG = "wgup"
 VERSION = "0.0.0"
 
 CONFIG_VERSION = 1
