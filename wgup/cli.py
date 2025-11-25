@@ -125,6 +125,7 @@ class Iface:
         print(_FMT_ATTRS.format("VPN IPv6 Pool", iface.vpn_cidr6))
         print(_FMT_ATTRS.format("NAT", "Enabled" if iface.nat_iface else "Disabled"))
         if iface.nat_iface:
+            print(_FMT_ATTRS.format("NAT Interface", iface.nat_iface))
             print(_FMT_ATTRS.format("NAT IPv4 Dests", ", ".join(iface.nat_cidr4)))
             print(_FMT_ATTRS.format("NAT IPv6 Dests", ", ".join(iface.nat_cidr6)))
         return 0
