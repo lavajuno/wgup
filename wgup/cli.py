@@ -8,6 +8,7 @@ from wgup import defaults, wireguard
 from wgup.config import Config
 from wgup.util import (
     IP,
+    ArgsException,
     ExitException,
     Input,
     InterfaceNotFoundException,
@@ -31,6 +32,7 @@ class Iface:
         NAME = "name"
         HOST = "host"
         PORT = "port"
+        NAT_IFACE = "nat_iface"
 
     @staticmethod
     def _get(c: Config, args: argparse.Namespace):
@@ -122,6 +124,9 @@ class Iface:
         print(_FMT_ATTRS.format("VPN IPv4 Pool", iface.vpn_cidr4))
         print(_FMT_ATTRS.format("VPN IPv6 Pool", iface.vpn_cidr6))
         print(_FMT_ATTRS.format("NAT", "Enabled" if iface.nat_iface else "Disabled"))
+        if iface.nat_iface:
+            print(_FMT_ATTRS.format("NAT IPv4 Dests", ", ".join(iface.nat_cidr4)))
+            print(_FMT_ATTRS.format("NAT IPv6 Dests", ", ".join(iface.nat_cidr6)))
         return 0
 
     @classmethod
@@ -142,6 +147,13 @@ class Iface:
                     print(reason)
                     return 1
                 iface.port = int(args.value)
+            case cls.Attributes.NAT_IFACE.value:
+                valid, reason = Input.check_iface(args.value)
+                if not valid:
+                    print("[!] NAT interface is invalid:")
+                    print(reason)
+                    return 1
+                iface.nat_iface = args.value
             case _:
                 print(
                     f"[!] Please specify one of the following attributes: {", ".join(x.value for x in cls.Attributes)}"
@@ -210,19 +222,73 @@ class Iface:
 
     @classmethod
     def nat_create(cls, args: argparse.Namespace):
-        raise NotImplementedError
+        if not (args.cidr4 or args.cidr6):
+            raise ArgsException(
+                "[!] Please specify an IPv4 or IPv6 destination (or both)."
+            )
+        c = Config()
+        iface = cls._get(c, args)
+        if args.cidr4 and args.cidr4 not in iface.nat_cidr4:
+            valid, reason = Input.check_cidr4(args.cidr4)
+            if not valid:
+                print("[!] IPv4 CIDR is invalid:")
+                print(reason)
+                return 1
+            iface.nat_cidr4.append(args.cidr4)
+        if args.cidr6 not in iface.nat_cidr6:
+            valid, reason = Input.check_cidr6(args.cidr6)
+            if not valid:
+                print("[!] IPv6 CIDR is invalid:")
+                print(reason)
+                return 1
+            iface.nat_cidr6.append(args.cidr6)
+        c.save()
+        print(f'[i] Created NAT on interface "{args.interface}".')
+        return 0
 
     @classmethod
     def nat_rm(cls, args: argparse.Namespace):
-        raise NotImplementedError
+        if not (args.cidr4 or args.cidr6):
+            raise ArgsException(
+                "[!] Please specify an IPv4 or IPv6 destination (or both)."
+            )
+        c = Config()
+        iface = cls._get(c, args)
+        if args.cidr4:
+            valid, reason = Input.check_cidr4(args.cidr4)
+            if not valid:
+                print("[!] IPv4 CIDR is invalid:")
+                print(reason)
+                return 1
+            if args.cidr4 in iface.nat_cidr4:
+                iface.nat_cidr4.remove(args.cidr4)
+            else:
+                raise ArgsException(
+                    f'[!] NAT to {args.cidr4} does not exist on interface "{args.interface}".'
+                )
+        if args.cidr6:
+            valid, reason = Input.check_cidr6(args.cidr6)
+            if not valid:
+                print("[!] IPv6 CIDR is invalid:")
+                print(reason)
+                return 1
+            if args.cidr6 in iface.nat_cidr6:
+                iface.nat_cidr6.remove(args.cidr6)
+            else:
+                raise ArgsException(
+                    f'[!] NAT to {args.cidr6} does not exist on interface "{args.interface}".'
+                )
+            c.save()
+        print(f'[i] Removed NAT on interface "{args.interface}".')
+        return 0
 
     @classmethod
     def rekey(cls, args: argparse.Namespace):
-        raise NotImplementedError
         c = Config()
         iface = cls._get(c, args)
+        iface.rekey()
         c.save()
-        print(f'[i] Rekeyed interface "args.interface".')
+        print(f'[i] Rekeyed interface "{args.interface}".')
         print(
             "    Please export its interface and peer configs again to connect using the new keys."
         )
@@ -460,6 +526,7 @@ def get_parser():
     iface_create.add_argument("name", type=str, default="")
     iface_create.add_argument("--cidr4", type=str, default="")
     iface_create.add_argument("--cidr6", type=str, default="")
+    iface_create.add_argument("--nat_iface", type=str, default="")
     iface_create.add_argument("--host", type=str, required=True)
     iface_create.add_argument("--port", type=int, required=True)
 
@@ -470,6 +537,10 @@ def get_parser():
 
     # iface.set
     iface_set = iface_sub.add_parser("set", help="Set parameters for an interface")
+    iface_set.set_defaults(func=Iface.set)
+    iface_set.add_argument("interface", type=str)
+    iface_set.add_argument("attribute", type=str)
+    iface_set.add_argument("value", type=str)
 
     # iface.remove
     iface_rm = iface_sub.add_parser("rm", help="Remove an interface")
@@ -512,7 +583,6 @@ def get_parser():
     )
     iface_rekey.set_defaults(func=Iface.rekey)
     iface_rekey.add_argument("interface", type=str)
-    iface_rekey.add_argument("--force", action="store_true")
 
     # peer.*
     peer = root_sub.add_parser("peer", help="Manage peers")
@@ -566,7 +636,6 @@ def get_parser():
     peer_rekey.set_defaults(func=Peer.rekey)
     peer_rekey.add_argument("interface", type=str)
     peer_rekey.add_argument("peer", type=str)
-    peer_rekey.add_argument("--force", action="store_true")
 
     # nat.*
     nat = root_sub.add_parser("nat", help="Manage NATs")
@@ -576,7 +645,6 @@ def get_parser():
     nat_create = nat_sub.add_parser("create", help="Create a NAT")
     nat_create.set_defaults(func=Iface.nat_create)
     nat_create.add_argument("interface", type=str)
-    nat_create.add_argument("destination", type=str)
     nat_create.add_argument("--cidr4", type=str, default="")
     nat_create.add_argument("--cidr6", type=str, default="")
 
@@ -584,7 +652,6 @@ def get_parser():
     nat_rm = nat_sub.add_parser("rm", help="Remove a NAT")
     nat_rm.set_defaults(func=Iface.nat_rm)
     nat_rm.add_argument("interface", type=str)
-    nat_rm.add_argument("destination", type=str)
     nat_rm.add_argument("--cidr4", type=str, default="")
     nat_rm.add_argument("--cidr6", type=str, default="")
 

@@ -184,10 +184,16 @@ wgup peer export wg0 laptop --filename laptop_wg.conf
 > NOTE: After making changes to NATs, you need to export peer configs again for
 > the new or removed routes to take effect.
 
-To NAT all traffic from "wg0" to the physical interface "eth0":
+To specify a physical interface to NAT traffic to:
 
 ```bash
-wgup nat create wg0 eth0 --cidr4 0.0.0.0/0 --cidr6 ::/0
+wgup iface set wg0 nat_iface eth0
+```
+
+To NAT all traffic from "wg0":
+
+```bash
+wgup nat create wg0 --cidr4 0.0.0.0/0 --cidr6 ::/0
 ```
 
 > You must include either an IPv4 or IPv6 destination (or both).
@@ -195,7 +201,7 @@ wgup nat create wg0 eth0 --cidr4 0.0.0.0/0 --cidr6 ::/0
 To remove an existing NAT:
 
 ```bash
-wgup nat rm wg0 eth0 --cidr4 0.0.0.0/0
+wgup nat rm wg0 --cidr4 0.0.0.0/0
 ```
 
 ## Licensing

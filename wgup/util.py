@@ -11,6 +11,10 @@ class ExitException(Exception):
     pass
 
 
+class ArgsException(ExitException):
+    pass
+
+
 class ConfigVersionException(ExitException):
     pass
 

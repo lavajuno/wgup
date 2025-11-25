@@ -343,6 +343,12 @@ class Interface:
             self.__get_peers_config(),
         )
 
+    def rekey(self):
+        self.private_key = CommandLine.generate_private_key()
+        self.public_key = CommandLine.generate_public_key(self.private_key)
+        for peer in self.peers.values():
+            peer.rekey()
+
     def to_json(self):
         return {
             "private_key": self.private_key,
