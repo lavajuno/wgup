@@ -250,7 +250,7 @@ class Iface:
                 print(reason)
                 return 1
             iface.nat_cidr4.append(args.cidr4)
-        if args.cidr6 not in iface.nat_cidr6:
+        if args.cidr6 and args.cidr6 not in iface.nat_cidr6:
             valid, reason = Input.check_cidr6(args.cidr6)
             if not valid:
                 print("[!] IPv6 CIDR is invalid:")
