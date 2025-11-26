@@ -67,6 +67,10 @@ connections to other machines are not at risk.
 
 - wgup stores its configuration in `~/.wgup`.
 
+- wgup allows you to perform elevated operations (copying files to
+/etc/wireguard and managing systemd targets for interfaces). Please take a look
+at the code for `wgup.wireguard.CommandLine` to see what it's doing.
+
 ## Usage
 
 ### Help
@@ -133,8 +137,9 @@ wgup iface rekey wg0
 To export an interface's config for use:
 
 ```bash
-wgup iface export wg0  # exports configs to /etc/wireguard by default
-wgup iface export wg0 --path /other/wireguard/config/directory
+wgup iface sync wg0  # syncs config to /etc/wireguard (recommended)
+wgup iface export wg0 # prints config to stdout
+wgup iface export wg0 --filename=wg0.conf # exports config to a file
 ```
 
 ### Managing peers

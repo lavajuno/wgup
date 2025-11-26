@@ -183,20 +183,34 @@ class Iface:
         return 0
 
     @classmethod
+    def sync(cls, args: argparse.Namespace):
+        c = Config()
+        iface = cls._get(c, args)
+        iface_conf = iface.get_config()
+        temp_filename = f"{defaults.CONFIG_DIR}/sync_temp"
+        try:
+            with open(temp_filename, "w") as f:
+                f.write(iface_conf)
+        except Exception as e:
+            print(f"[!] Could not write temporary file: {str(e)}")
+        iface.sync(temp_filename)
+        print(f'[i] Synced interface "{args.interface}".')
+        return 0
+
+    @classmethod
     def export(cls, args: argparse.Namespace):
         c = Config()
         iface = cls._get(c, args)
-        if iface is None:
-            print(f'[!] Interface "{args.interface}" does not exist.')
-            return 1
         iface_conf = iface.get_config()
-        filename = f"{str(args.path).rstrip("/")}/{args.interface}.conf"
-        try:
-            with open(filename, "w") as f:
-                f.write(iface_conf)
-            print(f'[i] Wrote "{filename}"')
-        except Exception as e:
-            print(f'[i] Could not write "{filename}": {str(e)}')
+        if args.filename:
+            try:
+                with open(args.filename, "w") as f:
+                    f.write(iface_conf)
+                print(f'[i] Wrote "{args.filename}"')
+            except Exception as e:
+                print(f'[!] Could not write "{args.filename}": {str(e)}')
+        else:
+            print(iface_conf)
             return 1
         return 0
 
@@ -555,7 +569,7 @@ def get_parser():
     )
     iface_export.set_defaults(func=Iface.export)
     iface_export.add_argument("interface", type=str)
-    iface_export.add_argument("-p", "--path", type=str, default="/etc/wireguard")
+    iface_export.add_argument("-f", "--filename", type=str)
 
     # iface.up
     iface_up = iface_sub.add_parser(
@@ -584,6 +598,13 @@ def get_parser():
     )
     iface_rekey.set_defaults(func=Iface.rekey)
     iface_rekey.add_argument("interface", type=str)
+
+    # iface.sync
+    iface_sync = iface_sub.add_parser(
+        "sync", help="Update an interface's config in /etc/wireguard"
+    )
+    iface_sync.set_defaults(func=Iface.sync)
+    iface_sync.add_argument("interface", type=str)
 
     # peer.*
     peer = root_sub.add_parser("peer", help="Manage peers")
