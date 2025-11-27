@@ -437,6 +437,7 @@ class Peer:
             nat_cidr6=iface.nat_cidr6,
             endpoint_public_key=iface.public_key,
             endpoint_host=iface.host,
+            endpoint_port=iface.port,
         )
         if args.filename:
             try:
