@@ -23,7 +23,7 @@ _stderr_handler.setFormatter(logging.Formatter("{levelname:<8} : {message}", sty
 _logger.addHandler(_stderr_handler)
 
 _FMT_INTERFACES = "{iface:15} : {host}:{port}"
-_FMT_PEERS = "{name:20} : {cidr4:14} : {cidr6}"
+_FMT_PEERS = "{name:20} : {cidr4:16} : {cidr6}"
 _FMT_ATTRS = "{:20} : {}"
 
 
