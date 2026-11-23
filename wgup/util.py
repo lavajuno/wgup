@@ -89,6 +89,37 @@ class Input:
                 return False, "Value is required."
         return True, ""
 
+    @staticmethod
+    def check_addr_list(value: str, optional: bool = False):
+        if value:
+            addresses = list(a.strip() for a in value.split(","))
+            for addr in addresses:
+                is_addr = False
+                try:
+                    ipaddress.IPv4Address(addr)
+                    is_addr = True
+                except ValueError:
+                    pass
+                try:
+                    ipaddress.IPv6Address(addr)
+                    is_addr = True
+                except ValueError:
+                    pass
+                if not is_addr:
+                    return (
+                        False,
+                        f"{addr} is not a valid IP address.",
+                    )
+
+        else:
+            if not optional:
+                return False, "Value is required."
+        return True, ""
+
+    @staticmethod
+    def sanitize_addr_list(value: str):
+        return ",".join(a.strip() for a in value.split(","))
+
 
 class IP:
     @staticmethod
