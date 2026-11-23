@@ -14,6 +14,8 @@ class TestWireguard(TestCase):
             host="example.com",
             port=12345,
         )
+        self.iface.mtu = 1280
+        self.iface.dns = "1.1.1.1,1.0.0.1"
         self.peer0 = wireguard.Peer.create(
             name="peer0",
             cidr4=IP.next_addr4(self.iface.vpn_cidr4, []),

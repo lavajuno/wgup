@@ -31,7 +31,9 @@ class Config:
         with open(_CONFIG_INTERFACES, "rb") as f:
             interfaces_json = json.loads(f.read())
         if interfaces_json["version"] > defaults.CONFIG_VERSION:
-            raise ConfigVersionException(f"[!] Incompatible config version. Update wgup to use this config.")
+            raise ConfigVersionException(
+                f"[!] Incompatible config version. Update wgup to use this config."
+            )
         for i in interfaces_json["interfaces"]:
             interface = Interface.from_json(i)
             self.interfaces[interface.vpn_iface] = interface

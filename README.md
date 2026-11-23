@@ -141,6 +141,15 @@ To modify an interface's parameters after creating it:
 wgup iface set wg0 cidr4 172.31.1.0/24
 wgup iface set wg0 cidr6 2001:db8::1/64
 wgup iface set wg0 name wg1
+wgup iface set wg0 mtu 1280
+wgup iface set wg0 dns "1.1.1.1,1.0.0.1"
+```
+
+To return applicable parameters to their defaults:
+
+```
+wgup iface set wg0 mtu default
+wgup iface set wg0 dns default
 ```
 
 To rekey an interface (generates new keys for the interface and all its peers):

@@ -32,6 +32,7 @@ class Iface:
         HOST = "host"
         PORT = "port"
         MTU = "mtu"
+        DNS = "dns"
         NAT_IFACE = "nat_iface"
 
     @staticmethod
@@ -64,6 +65,7 @@ class Iface:
         c = Config()
         # sanitize params
         # TODO(lavajuno): write library for command line forms
+        # NOTE(lavajuno) 20261123: lol
         iface_name = str(args.name)
         valid, reason = Input.check_iface(iface_name)
         if not valid:
@@ -124,8 +126,7 @@ class Iface:
         print(_FMT_ATTRS.format("VPN IPv4 Pool", iface.vpn_cidr4))
         print(_FMT_ATTRS.format("VPN IPv6 Pool", iface.vpn_cidr6))
         print(_FMT_ATTRS.format("MTU", iface.mtu if iface.mtu > 0 else "default"))
-        # TODO(lavajuno): Finish implementing DNS
-        # print(_FMT_ATTRS.format("DNS", iface.dns if iface.dns else "not configured"))
+        print(_FMT_ATTRS.format("DNS", iface.dns if iface.dns else "not configured"))
         print(_FMT_ATTRS.format("NAT", "Enabled" if iface.nat_iface else "disabled"))
         if iface.nat_iface:
             print(_FMT_ATTRS.format("NAT Interface", iface.nat_iface))
@@ -159,11 +160,24 @@ class Iface:
                         args.value, min_value=1280, max_value=9000
                     )
                     # TODO(lavajuno): should we warn new users about using jumbo frames?
+                    # NOTE(lavajuno) 20261123: Every situation I've seen in which the default mtu doesn't work is the
+                    #               result of naughty behavior from ISPs.
                     if not valid:
                         print("[!] MTU is invalid:")
                         print(reason)
                         return 1
                     iface.mtu = int(args.value)
+            case cls.Attributes.DNS.value:
+                if str(args.value) == "default":
+                    iface.dns = ""
+                else:
+                    valid, reason = Input.check_addr_list(args.value)
+                    if not valid:
+                        print("[!] DNS is invalid:")
+                        print(reason)
+                        return 1
+                    iface.dns = Input.sanitize_addr_list(args.value)
+
             case cls.Attributes.NAT_IFACE.value:
                 valid, reason = Input.check_iface(args.value)
                 if not valid:
@@ -452,6 +466,7 @@ class Peer:
             nat_cidr4=iface.nat_cidr4,
             nat_cidr6=iface.nat_cidr6,
             mtu=iface.mtu,
+            dns=iface.dns,
             endpoint_public_key=iface.public_key,
             endpoint_host=iface.host,
             endpoint_port=iface.port,
@@ -559,7 +574,6 @@ def get_parser():
     iface_create.add_argument("name", type=str, default="")
     iface_create.add_argument("--cidr4", type=str, default="")
     iface_create.add_argument("--cidr6", type=str, default="")
-    iface_create.add_argument("--nat_iface", type=str, default="")
     iface_create.add_argument("--host", type=str, required=True)
     iface_create.add_argument("--port", type=int, required=True)
 
@@ -572,7 +586,11 @@ def get_parser():
     iface_set = iface_sub.add_parser("set", help="Set parameters for an interface")
     iface_set.set_defaults(func=Iface.set)
     iface_set.add_argument("interface", type=str)
-    iface_set.add_argument("attribute", type=str, help=f"one of {{{", ".join(x.value for x in Iface.Attributes)}}}")
+    iface_set.add_argument(
+        "attribute",
+        type=str,
+        help=f"one of {{{", ".join(x.value for x in Iface.Attributes)}}}",
+    )
     iface_set.add_argument("value", type=str)
 
     # iface.remove
@@ -661,7 +679,11 @@ def get_parser():
     peer_set.set_defaults(func=Peer.set)
     peer_set.add_argument("interface", type=str)
     peer_set.add_argument("peer", type=str)
-    peer_set.add_argument("attribute", type=str,  help=f"one of {{{", ".join(x.value for x in Peer.Attributes)}}}")
+    peer_set.add_argument(
+        "attribute",
+        type=str,
+        help=f"one of {{{", ".join(x.value for x in Peer.Attributes)}}}",
+    )
     peer_set.add_argument("value", type=str)
 
     # peer.rm
